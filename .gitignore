@@ -1,0 +1,47 @@
+# ------------------------
+# Laravel
+# ------------------------
+backend/cleanlink-api/vendor/
+backend/cleanlink-api/node_modules/
+backend/cleanlink-api/storage/*.key
+backend/cleanlink-api/.env
+backend/cleanlink-api/.env.backup
+backend/cleanlink-api/.phpunit.result.cache
+
+# ------------------------
+# Flutter
+# ------------------------
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub-cache
+
+# Android
+**/android/.gradle
+**/android/app/build
+
+# iOS
+**/ios/Pods
+**/ios/.symlinks
+
+# ------------------------
+# React / Node
+# ------------------------
+**/node_modules
+**/dist
+**/build
+
+# ------------------------
+# IDE / Editor
+# ------------------------
+.vscode/
+.idea/
+*.log
+
+# ------------------------
+# OS Files
+# ------------------------
+.DS_Store
+Thumbs.db
