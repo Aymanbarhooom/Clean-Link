@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
@@ -83,6 +84,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('worker-profiles')->group(function () {
         Route::get('/{worker}', [WorkerProfileController::class, 'show']);
-        Route::put('/{worker}', [WorkerProfileController::class, 'update']);
+        Route::put('/', [WorkerProfileController::class, 'update']);
     });
+    // ==========================================
+// 📊 Global Attribute Dictionary Pathways
+// ==========================================
+    Route::prefix('attributes')->group(function () {
+    Route::get('/', [AttributeController::class, 'index']);      // Accessible to Admin & Company Managers
+    Route::post('/', [AttributeController::class, 'store']);     // Admin only
+    Route::delete('/{attribute}', [AttributeController::class, 'destroy']); // Admin only
+});
+
 });

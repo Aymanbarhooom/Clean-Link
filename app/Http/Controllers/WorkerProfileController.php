@@ -23,17 +23,7 @@ class WorkerProfileController extends Controller
      */
     public function show(User $worker): JsonResponse
     {
-        if (!$worker->isWorker()) {
-            return $this->errorResponse('Target operational user profile mapping identity is not a worker', 422);
-        }
-
-        $user = auth()->user();
-        
-        // Scope structural visibility configurations
-        if (!$user->isAdmin() && !$user->isCompanyManager() && $user->id !== $worker->id) {
-            return $this->errorResponse('Visibility index query block authorization error', 403);
-        }
-
+ 
         $profile = $worker->workerProfile()->with('user.profile')->first();
         return $this->successResponse($profile, 'Worker extension record structure retrieved');
     }
@@ -41,17 +31,11 @@ class WorkerProfileController extends Controller
     /**
      * Modify targeted structural experience attributes.
      */
-    public function update(Request $request, User $worker): JsonResponse
+    public function update(Request $request): JsonResponse
     {
-        if (!$worker->isWorker()) {
-            return $this->errorResponse('Target operational reference profile identity is not a worker', 422);
-        }
-
-        $user = auth()->user();
-
-        // Security check: Admins or the explicit managing supervisor account can update these metrics
-        if (!$user->isAdmin() && !$user->isCompanyManager()) {
-            return $this->errorResponse('Action processing boundary execution access denied', 403);
+       $worker = auth()->user();
+       if(!$worker->isWorker()) {
+            return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
         }
 
         $validated = $request->validate([
