@@ -99,5 +99,65 @@ class AuthController extends Controller
 
         return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
     }
+    /**
+     * Update Account Profile Information (User + Profile Models)
+     * Route: PUT /api/auth/profile/update
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'fullname' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:30',
+            'address' => 'nullable|string|max:500',
+            'image' => 'nullable|string', // Base64 or uploaded file path string
+        ]);
+
+        // Update core user records
+        $user->update([
+            'fullname' => $validated['fullname'],
+            'email' => $validated['email'],
+        ]);
+
+        // Update linked profile parameters
+        $user->profile()->update([
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'image' => $validated['image'] ?? null,
+        ]);
+
+        return $this->successResponse(
+            $user->load('profile'), 
+            'Account information updated successfully'
+        );
+    }
+
+    /**
+     * Secure and isolated password modification endpoint
+     * Route: POST /api/auth/profile/change-password
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'old_password' => 'required',
+            'new_password' => 'required|string|min:8|confirmed', // Requires 'new_password_confirmation' from frontend
+        ]);
+
+        // Validate the historical password mapping match
+        if (!Hash::check($validated['old_password'], $user->password)) {
+            return $this->errorResponse('The current password you entered is incorrect', 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($validated['new_password'])
+        ]);
+
+        return $this->successResponse([], 'Password changed successfully');
+    }
+
 
 }

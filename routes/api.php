@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyManagerController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\WorkerProfileController;
@@ -26,8 +27,12 @@ Route::prefix('auth')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/fcm-token', [AuthController::class, 'updateFcmToken']);
+        Route::put('/update', [AuthController::class, 'updateProfile']);
+        Route::put('/change-password', [AuthController::class, 'changePassword']);
     });
 });
+
+Route::get('/home-page', [HomeController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
 

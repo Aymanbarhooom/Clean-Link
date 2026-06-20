@@ -18,8 +18,8 @@ class ServiceSeeder extends Seeder
         $sparkleAuto = Company::where('name_en', 'Sparkle Auto Express')->first();
 
         //Categories
-        $homeCleaning = Category::where('name_en', 'Home Cleaning')->first();
-        $carWash = Category::where('name_en', 'Car Detailing & Wash')->first();
+        $homeCleaning = Category::where('name_en', 'Home')->first();
+        $carWash = Category::where('name_en', 'Car')->first();
 
         // Fetch our pre-seeded global dictionary attributes to link below
         $extraRooms = Attribute::where('name_en', 'Number of Extra Rooms')->first();
@@ -54,7 +54,7 @@ class ServiceSeeder extends Seeder
             'max_duration' => 180,
             'price' => 50.00,
             'image' => 'services/standard_apartment.png',
-            'discount' => 5.00,
+            'discount' => 0.00,
         ]);
         // Attach localized flexible dynamic addon rules for this explicit service
         $s1->attributes()->attach([
@@ -136,7 +136,7 @@ class ServiceSeeder extends Seeder
             'max_duration' => 600,
             'price' => 350.00,
             'image' => 'services/villa.png',
-            'discount' => 50.00,
+            'discount' => 0.00,
         ]);
         $s5->attributes()->attach([
             $extraRooms->id => ['price' => 40.00, 'duration' => 60],
@@ -161,7 +161,7 @@ class ServiceSeeder extends Seeder
             'max_duration' => 45,
             'price' => 15.00,
             'image' => 'services/eco_wash.png',
-            'discount' => 0.00,
+            'discount' => 10.00,
         ]);
         $s6->attributes()->attach([
             $bodyWax->id => ['price' => 10.00, 'duration' => 20]
@@ -180,7 +180,7 @@ class ServiceSeeder extends Seeder
             'max_duration' => 90,
             'price' => 35.00,
             'image' => 'services/full_car.png',
-            'discount' => 3.00,
+            'discount' => 0.00,
         ]);
         $s7->attributes()->attach([
             $carSeats->id => ['price' => 5.00, 'duration' => 15], // Price calculated per extra seat
@@ -238,7 +238,7 @@ class ServiceSeeder extends Seeder
             'max_duration' => 300, 
             'price' => 150.00, 
             'image' => 'services/showroom.png', 
-            'discount' => 15.00,]);
+            'discount' => 0.00,]);
         $s10->attributes()->attach([
             $bodyWax->id => ['price' => 0.00, 'duration' => 0],
             $engineSteam->id => ['price' => 0.00, 'duration' => 0],
