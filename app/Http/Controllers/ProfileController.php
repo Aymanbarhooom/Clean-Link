@@ -23,7 +23,7 @@ class ProfileController extends Controller
     public function show(): JsonResponse
     {
         $profile = auth()->user()->profile;
-        
+
         if (!$profile) {
             return $this->errorResponse('Target operational matrix record entry corrupt or missing', 404);
         }
@@ -36,20 +36,20 @@ class ProfileController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        $profile = auth()->user()->profile;
+        // Get the authenticated user's profile or create a new one if it doesn't exist
+        $profile = auth()->user()->profile()->firstOrCreate(['user_id' => auth()->id()]);
 
-        if (!$profile) {
-            return $this->errorResponse('Target profile sequence reference map missing', 404);
-        }
-
+        // Validate the incoming request data
         $validated = $request->validate([
             'image' => 'nullable|string',
             'address' => 'nullable|string|max:500',
             'phone' => 'nullable|string|max:30',
         ]);
 
+        // Update the profile with validated data
         $profile->update($validated);
-        
+
         return $this->successResponse($profile, 'User metadata parameters modified successfully');
     }
+
 }
