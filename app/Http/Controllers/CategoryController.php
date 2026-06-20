@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\Category;
+use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+
+class CategoryController extends Controller
+{
+    use ApiResponse;
+
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except(['index', 'show']);
+    }
+
+    public function index(): JsonResponse
+    {
+        $categories = Category::all();
+        return $this->successResponse($categories, 'Categories matrix retrieved successfully');
+    }
+
+    public function show(Category $category): JsonResponse
+    {
+        return $this->successResponse($category->load('services'), 'Category specific parameters loaded');
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        if (!auth()->user()->isAdmin()) {
+            return $this->errorResponse('Access restricted to administrative accounts only', 403);
+        }
+
+        $validated = $request->validate([
+            'name_ar' => 'required|string|max:255',
+            'name_en' => 'required|string|max:255',
+            'description_ar' => 'nullable|string',
+            'description_en' => 'nullable|string',
+            'image' => 'nullable|string',
+        ]);
+
+        $category = Category::create($validated);
+        return $this->successResponse($category, 'Category established inside index registries', 211);
+    }
+
+    public function update(Request $request, Category $category): JsonResponse
+    {
+        if (!auth()->user()->isAdmin()) {
+            return $this->errorResponse('Access restricted to administrative accounts only', 403);
+        }
+
+        $validated = $request->validate([
+            'name_ar' => 'sometimes|string|max:255',
+            'name_en' => 'sometimes|string|max:255',
+            'description_ar' => 'nullable|string',
+            'description_en' => 'nullable|string',
+            'image' => 'nullable|string',
+        ]);
+
+        $category->update($validated);
+        return $this->successResponse($category, 'Category structural configuration parameters modified');
+    }
+
+    public function destroy(Category $category): JsonResponse
+    {
+        if (!auth()->user()->isAdmin()) {
+            return $this->errorResponse('Access restricted to administrative accounts only', 403);
+        }
+
+        $category->delete();
+        return $this->successResponse([], 'Category scrubbed from architecture records');
+    }
+}

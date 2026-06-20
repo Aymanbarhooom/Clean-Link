@@ -1,0 +1,60 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+
+class Service extends Model
+{
+    protected $fillable = [
+        'company_id', 'name_ar', 'name_en', 'description_ar', 'description_en', 'rating', 
+        'min_duration', 'max_duration', 'price', 'image', 'discount'
+    ];
+
+    // --- Relationships ---
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function packages(): HasMany
+    {
+        return $this->hasMany(Package::class);
+    }
+
+    /**
+     * Many-to-Many connection mapping custom attribute pricing schemas.
+     */
+    public function attributes(): BelongsToMany
+    {
+        return $this->belongsToMany(Attribute::class, 'attribute_service')
+                    ->withPivot('price', 'duration')
+                    ->withTimestamps();
+    }
+
+    public function reviews(): MorphMany
+    {
+        return $this->morphMany(Review::class, 'reviewable');
+    }
+
+    // --- Helper Functions ---
+
+    public function getFinalPriceAttribute(): float
+    {
+        return max(0, $this->price - $this->discount);
+    }
+
+    public function recalculateRating(): void
+    {
+        $this->update(['rating' => $this->reviews()->avg('rating') ?? 0.00]);
+    }
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+}
