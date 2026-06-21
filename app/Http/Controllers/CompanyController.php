@@ -141,7 +141,7 @@ class CompanyController extends Controller
     public function showCompany(Company $company): JsonResponse
     {
         $this->authorize('view', $company);
-        return $this->successResponse($company->load(['manager', 'region', 'services']), 'Company profile retrieved');
+        return $this->successResponse($company->load([ 'region', 'services']), 'Company profile retrieved');
     }
 
     public function deleteCompany(Company $company): JsonResponse

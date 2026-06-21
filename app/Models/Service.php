@@ -41,6 +41,10 @@ class Service extends Model
     {
         return $this->morphMany(Review::class, 'reviewable');
     }
+     public function images()
+    {
+        return $this->hasMany(ServiceImage::class);
+    }
 
     // --- Helper Functions ---
 

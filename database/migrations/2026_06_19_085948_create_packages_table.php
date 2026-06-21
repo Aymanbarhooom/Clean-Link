@@ -15,8 +15,6 @@ return new class extends Migration
             $table->integer('duration')->comment('in minutes');
             $table->decimal('price', 10, 2);
             $table->json('details'); // Holds an array/list of strings
-            $table->string('image_before')->nullable();
-            $table->string('image_after')->nullable();
             $table->timestamps();
         });
     }
