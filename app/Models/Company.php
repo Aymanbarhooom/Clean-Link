@@ -6,12 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Carbon\Carbon;
 
 class Company extends Model
 {
     protected $fillable = [
-        'category_id', 'manager_id', 'region_id', 'name_ar', 'name_en', 
+         'manager_id', 'region_id', 'name_ar', 'name_en', 
         'description_ar', 'description_en', 'image', 
         'location_ar', 'location_en', 'rating', 'is_open', 'start_hour', 'close_hour'
     ];
@@ -65,4 +66,10 @@ class Company extends Model
     {
         $this->update(['rating' => $this->reviews()->avg('rating') ?? 0.00]);
     }
+    protected function image(): Attribute
+{
+    return Attribute::make(
+        get: fn ($value) => $value ? asset('storage/' . $value) : null,
+    );
+}
 }

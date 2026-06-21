@@ -44,7 +44,7 @@ class ServiceController extends Controller
     {
         // Clean schema eager-loading matching your architectural workflow parameters
         $service->load([
-            'company.category', 
+            'company', 
             'company', 
             'packages', 
             'attributes',
@@ -71,6 +71,7 @@ class ServiceController extends Controller
         }
 
         $validated = $request->validate([
+            'company_id' => 'required|exists:companies,id',
             'name_ar' => 'required|string|max:255',
             'name_en' => 'required|string|max:255',
             'description_ar' => 'nullable|string',

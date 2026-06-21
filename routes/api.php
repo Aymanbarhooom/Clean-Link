@@ -8,6 +8,7 @@ use App\Http\Controllers\CompanyManagerController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\WorkerProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -99,5 +100,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/', [AttributeController::class, 'store']);     // Admin only
     Route::delete('/{attribute}', [AttributeController::class, 'destroy']); // Admin only
 });
+
+// ==========================================
+// 🧹 Core Clean Service Matrix Pathways
+// ==========================================
+Route::apiResource('services', ServiceController::class);
+
 
 });

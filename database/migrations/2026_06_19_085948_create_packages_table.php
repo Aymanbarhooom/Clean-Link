@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('name');
             $table->integer('duration')->comment('in minutes');
             $table->decimal('price', 10, 2);
+            $table->decimal('price_after_discount',10, 2)->nullable()->comment('calculated price after applying any service-level discount');
             $table->json('details'); // Holds an array/list of strings
             $table->timestamps();
         });

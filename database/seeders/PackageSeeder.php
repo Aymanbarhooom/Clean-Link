@@ -28,7 +28,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'Studio Package',
                     'duration' => max(45, intval($service->min_duration * 0.6)),
-                    'price' => max(10, round($service->price * 0.6, 2)),
+                    'price' => 80,
+                    'price_after_discount' => $service->discount > 0 ? 80 - (80 * ($service->discount/100)) : 80,
                     'details' => [
                         'Ideal for spaces under 60m²',
                         'Includes 1 main living area & 1 bathroom refresh',
@@ -41,7 +42,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'Standard Flat Package',
                     'duration' => intval(($service->min_duration + $service->max_duration) / 2),
-                    'price' => round($service->price, 2),
+                    'price' => 60,
+                    'price_after_discount' => $service->discount > 0 ? 60 - (60 * ($service->discount/100)) : 60,
                     'details' => [
                         'Covers typical family flats up to 140m²',
                         'Deep wash of 3 rooms & 2 dedicated bathrooms',
@@ -54,7 +56,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'Duplex & Building Package',
                     'duration' => intval($service->max_duration * 1.5),
-                    'price' => round($service->price * 1.8, 2),
+                    'price' => 108,
+                    'price_after_discount' => $service->discount > 0 ? 108 - (108 * ($service->discount/100)) : 108,
                     'details' => [
                         'Suited for large duplex configurations or multi-story builds',
                         'Includes 5+ rooms, staircase sweeping, and balconies',
@@ -71,7 +74,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'Sedan / Hatchback Tier',
                     'duration' => max(20, intval($service->min_duration * 0.8)),
-                    'price' => max(5, round($service->price * 0.8, 2)),
+                    'price' => 24,
+                    'price_after_discount' => $service->discount > 0 ? (24 - (24 * ($service->discount/100))) : 24,
                     'details' => [
                         'Optimized for compact passenger vehicles & daily sedans',
                         'Standard 4-seat matching cabin vacuuming',
@@ -84,7 +88,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'SUV & Crossover Tier',
                     'duration' => intval(($service->min_duration + $service->max_duration) / 2),
-                    'price' => round($service->price, 2),
+                    'price' => 60,
+                    'price_after_discount' => $service->discount > 0 ?60 - (60 * ($service->discount/100)) : 60,
                     'details' => [
                         'Tailored specifically for 5 to 7 passenger crossover vehicles',
                         'Trunk storage debris extraction included',
@@ -97,7 +102,8 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name' => 'Large Van & Truck Elite Tier',
                     'duration' => intval($service->max_duration * 1.3),
-                    'price' => round($service->price * 1.4, 2),
+                    'price' => 240,
+                    'price_after_discount' => $service->discount > 0 ?240 - (240 * ($service->discount/100)) : 240,
                     'details' => [
                         'Engineered for large pickup trucks, luxury 4x4s, and multi-row vans',
                         'Full leather treatment conditioning or heavy fabric steam scrubbing',

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Package extends Model
 {
-    protected $fillable = ['service_id', 'name', 'duration', 'price', 'details'];
+    protected $fillable = ['service_id', 'name', 'duration', 'price','price_after_discount', 'details'];
 
     /**
      * Automatic JSON casting conversion for array structures.

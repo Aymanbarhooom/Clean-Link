@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+//use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Service extends Model
@@ -61,4 +62,10 @@ class Service extends Model
     {
         return $this->belongsTo(Category::class);
     }
+   /* protected function image(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value ? asset('storage/' . $value) : null,
+        );
+    }*/
 }
