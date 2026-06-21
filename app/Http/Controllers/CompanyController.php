@@ -72,7 +72,10 @@ class CompanyController extends Controller
     public function addCompany(Request $request): JsonResponse
     {
         $this->authorize('create', Company::class);
-
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('company_images', 'public');
+            $validated['image'] = $path;
+        }
         $validated = $request->validate([
             'manager_id' => 'required|exists:users,id',
             'region_id' => 'required|exists:regions,id',
@@ -80,7 +83,6 @@ class CompanyController extends Controller
             'name_en' => 'required|string',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
-            'image' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
             'start_hour' => 'nullable|date_format:H:i',
@@ -101,13 +103,15 @@ class CompanyController extends Controller
     public function updateCompany(Request $request, Company $company): JsonResponse
     {
         $this->authorize('update', $company);
-
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('company_images', 'public');
+            $validated['image'] = $path;
+        }
         $validated = $request->validate([
             'name_ar' => 'sometimes|string',
             'name_en' => 'sometimes|string',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
-            'image' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
             'is_open' => 'sometimes|boolean',

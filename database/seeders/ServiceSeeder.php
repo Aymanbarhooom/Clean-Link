@@ -53,7 +53,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 120,
             'max_duration' => 180,
             'price' => 50.00,
-            'image' => 'services/standard_apartment.png',
+            'image' => 'services/standard_apartment.jpg',
             'discount' => 0.00,
         ]);
         // Attach localized flexible dynamic addon rules for this explicit service
@@ -75,7 +75,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 240,
             'max_duration' => 360,
             'price' => 120.00,
-            'image' => 'services/deep_home.png',
+            'image' => 'services/deep_home.jpg',
             'discount' => 0.00,
         ]);
         $s2->attributes()->attach([
@@ -96,7 +96,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 300,
             'max_duration' => 480,
             'price' => 200.00,
-            'image' => 'services/post_con.png',
+            'image' => 'services/post_con.jpg',
             'discount' => 20.00,
         ]);
         $s3->attributes()->attach([
@@ -116,7 +116,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 90,
             'max_duration' => 150,
             'price' => 45.00,
-            'image' => 'services/kitchen.png',
+            'image' => 'services/kitchen.jpg',
             'discount' => 0.00,
         ]);
         $s4->attributes()->attach([
@@ -135,7 +135,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 360,
             'max_duration' => 600,
             'price' => 350.00,
-            'image' => 'services/villa.png',
+            'image' => 'services/villa.jpg',
             'discount' => 0.00,
         ]);
         $s5->attributes()->attach([
@@ -160,7 +160,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 30,
             'max_duration' => 45,
             'price' => 15.00,
-            'image' => 'services/eco_wash.png',
+            'image' => 'services/eco_wash.jpg',
             'discount' => 10.00,
         ]);
         $s6->attributes()->attach([
@@ -179,7 +179,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 60,
             'max_duration' => 90,
             'price' => 35.00,
-            'image' => 'services/full_car.png',
+            'image' => 'services/full_car.jpg',
             'discount' => 0.00,
         ]);
         $s7->attributes()->attach([
@@ -200,7 +200,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 90,
             'max_duration' => 120,
             'price' => 60.00,
-            'image' => 'services/car_steam.png',
+            'image' => 'services/car_steam.jpg',
             'discount' => 0.00,
         ]);
         $s8->attributes()->attach([
@@ -219,7 +219,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 40,
             'max_duration' => 60,
             'price' => 25.00,
-            'image' => 'services/headlights.png',
+            'image' => 'services/headlights.jpg',
             'discount' => 5.00,
         ]);
         $s9->attributes()->attach([
@@ -237,7 +237,7 @@ class ServiceSeeder extends Seeder
             'min_duration' => 180, 
             'max_duration' => 300, 
             'price' => 150.00, 
-            'image' => 'services/showroom.png', 
+            'image' => 'services/showroom.jpg', 
             'discount' => 0.00,]);
         $s10->attributes()->attach([
             $bodyWax->id => ['price' => 0.00, 'duration' => 0],

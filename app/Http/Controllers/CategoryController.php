@@ -33,13 +33,15 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('category_images', 'public');
+            $validated['image'] = $path;
+        }
         $validated = $request->validate([
             'name_ar' => 'required|string|max:255',
             'name_en' => 'required|string|max:255',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
-            'image' => 'nullable|string',
         ]);
 
         $category = Category::create($validated);
@@ -51,13 +53,15 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('category_images', 'public');
+            $validated['image'] = $path;
+        }
         $validated = $request->validate([
             'name_ar' => 'sometimes|string|max:255',
             'name_en' => 'sometimes|string|max:255',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
-            'image' => 'nullable|string',
         ]);
 
         $category->update($validated);

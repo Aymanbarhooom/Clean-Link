@@ -114,6 +114,10 @@ class AuthController extends Controller
             'address' => 'nullable|string|max:500',
             'image' => 'nullable|string', // Base64 or uploaded file path string
         ]);
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('profile_images', 'public');
+            $validated['image'] = $path;
+        }
 
         // Update core user records
         $user->update([
