@@ -32,11 +32,12 @@ class Order extends Model
     }
 
     public function attributes(): BelongsToMany
-    {
-        return $this->belongsToMany(Attribute::class, 'attribute_order')
-                    ->withPivot('qty', 'price_at_order')
-                    ->withTimestamps();
-    }
+{
+    return $this->belongsToMany(AttributeModel::class, 'attribute_order', 'order_id', 'attribute_id')
+                ->withPivot('qty', 'price_at_order')
+                ->withTimestamps();
+}
+
 
     // --- Helper Functions ---
 

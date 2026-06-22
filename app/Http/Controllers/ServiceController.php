@@ -72,6 +72,7 @@ class ServiceController extends Controller
 
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
+            'category_id' => 'required|exists:categories,id',
             'name_ar' => 'required|string|max:255',
             'name_en' => 'required|string|max:255',
             'description_ar' => 'nullable|string',
@@ -152,6 +153,11 @@ class ServiceController extends Controller
             
             // Perform target updates on core model attributes
             $service->update($validated);
+            $packages = $service->packages;
+            foreach ($packages as $package) {
+                $package->price_after_discount = $service->discount > 0 ? $package->price * (1 - $service->discount / 100) :  $package->price;
+                $package->save();
+            }
 
             // Sync resets and cleans the pivot map, removing omitted records automatically
             if (isset($validated['attributes'])) {
@@ -184,6 +190,38 @@ class ServiceController extends Controller
         $service->delete();
 
         return $this->successResponse([], 'Service permanently scrubbed from inventory matrices');
+    }
+    
+    /**
+     * Update service attributes exclusively, replacing the current list with new one.
+     * Route: PATCH /api/services/{id}/attributes
+     */
+    public function updateAttributes(Request $request, Service $service): JsonResponse
+    {
+        $this->authorize('update', $service);
+
+        $validated = $request->validate([
+            'attributes' => 'required|array',
+            'attributes.*.id' => 'required|exists:attributes,id',
+            'attributes.*.price' => 'required|numeric',
+            'attributes.*.duration' => 'required|integer',
+        ]);
+
+        DB::transaction(function () use ($validated, $service) {
+            $pivotPayload = [];
+            foreach ($validated['attributes'] as $attr) {
+                $pivotPayload[$attr['id']] = [
+                    'price' => $attr['price'],
+                    'duration' => $attr['duration']
+                ];
+            }
+            $service->attributes()->sync($pivotPayload);
+        });
+
+        return $this->successResponse(
+            $service->load('attributes'),
+            'Service attributes list successfully replaced'
+        );
     }
 }
 

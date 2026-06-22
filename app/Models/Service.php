@@ -12,8 +12,18 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 class Service extends Model
 {
     protected $fillable = [
-        'company_id', 'name_ar', 'name_en', 'description_ar', 'description_en', 'rating', 
-        'min_duration', 'max_duration', 'price', 'image', 'discount'
+        'company_id',
+        'category_id',
+        'name_ar',
+        'name_en',
+        'description_ar',
+        'description_en',
+        'rating',
+        'min_duration',
+        'max_duration',
+        'price',
+        'image',
+        'discount'
     ];
 
     // --- Relationships ---
@@ -33,16 +43,17 @@ class Service extends Model
      */
     public function attributes(): BelongsToMany
     {
-        return $this->belongsToMany(Attribute::class, 'attribute_service')
-                    ->withPivot('price', 'duration')
-                    ->withTimestamps();
+        return $this->belongsToMany(AttributeModel::class, 'attribute_service', 'service_id', 'attribute_id')
+            ->withPivot('price', 'duration')
+            ->withTimestamps();
     }
+
 
     public function reviews(): MorphMany
     {
         return $this->morphMany(Review::class, 'reviewable');
     }
-     public function images()
+    public function images()
     {
         return $this->hasMany(ServiceImage::class);
     }
@@ -62,7 +73,7 @@ class Service extends Model
     {
         return $this->belongsTo(Category::class);
     }
-   /* protected function image(): Attribute
+    /* protected function image(): Attribute
     {
         return Attribute::make(
             get: fn ($value) => $value ? asset('storage/' . $value) : null,

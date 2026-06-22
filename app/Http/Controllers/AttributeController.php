@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AttributeModel;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -24,7 +25,7 @@ class AttributeController extends Controller
      */
     public function index(): JsonResponse
     {
-        $attributes = Attribute::orderBy('created_at', 'desc')->get();
+        $attributes = AttributeModel::orderBy('created_at', 'desc')->get();
         return $this->successResponse($attributes, 'Global attribute dictionary retrieved successfully');
     }
 
@@ -44,7 +45,7 @@ class AttributeController extends Controller
             'type' => 'required|in:number,text,boolean',
         ]);
 
-        $attribute = Attribute::create($validated);
+        $attribute = AttributeModel::create($validated);
         
         return $this->successResponse($attribute, 'New global attribute added successfully to the dictionary', 211);
     }
@@ -52,7 +53,7 @@ class AttributeController extends Controller
     /**
      * Remove a global attribute from the system dictionary (Admin Only).
      */
-    public function destroy(Attribute $attribute): JsonResponse
+    public function destroy(AttributeModel $attribute): JsonResponse
     {
         // Enforce administrative actor validation
         if (!auth()->user()->isAdmin()) {

@@ -5,7 +5,7 @@ namespace Database\Seeders;
 
 use App\Models\Service;
 use App\Models\Company;
-use App\Models\Attribute;
+use App\Models\AttributeModel;
 use App\Models\Category;
 use Illuminate\Database\Seeder;
 
@@ -22,16 +22,16 @@ class ServiceSeeder extends Seeder
         $carWash = Category::where('name_en', 'Car')->first();
 
         // Fetch our pre-seeded global dictionary attributes to link below
-        $extraRooms = Attribute::where('name_en', 'Number of Extra Rooms')->first();
-        $extraBaths = Attribute::where('name_en', 'Number of Extra Bathrooms')->first();
-        $emptyHouse = Attribute::where('name_en', 'Is the House Empty (No Furniture)?')->first();
-        $postConst = Attribute::where('name_en', 'Post-Construction / Renovation Cleaning')->first();
-        $fridge = Attribute::where('name_en', 'Deep Inside Fridge Cleaning')->first();
+        $extraRooms = AttributeModel::where('name_en', 'Number of Extra Rooms')->first();
+        $extraBaths = AttributeModel::where('name_en', 'Number of Extra Bathrooms')->first();
+        $emptyHouse = AttributeModel::where('name_en', 'Is the House Empty (No Furniture)?')->first();
+        $postConst = AttributeModel::where('name_en', 'Post-Construction / Renovation Cleaning')->first();
+        $fridge = AttributeModel::where('name_en', 'Deep Inside Fridge Cleaning')->first();
 
-        $carSeats = Attribute::where('name_en', 'Number of Car Seats')->first();
-        $bodyWax = Attribute::where('name_en', 'Exterior Body Polishing & Waxing')->first();
-        $engineSteam = Attribute::where('name_en', 'Steam Engine Bay Cleaning')->first();
-        $headlights = Attribute::where('name_en', 'Headlight Restoration & Polishing')->first();
+        $carSeats = AttributeModel::where('name_en', 'Number of Car Seats')->first();
+        $bodyWax = AttributeModel::where('name_en', 'Exterior Body Polishing & Waxing')->first();
+        $engineSteam = AttributeModel::where('name_en', 'Steam Engine Bay Cleaning')->first();
+        $headlights = AttributeModel::where('name_en', 'Headlight Restoration & Polishing')->first();
 
         if (!$ecoCleanHome || !$sparkleAuto) {
             return;

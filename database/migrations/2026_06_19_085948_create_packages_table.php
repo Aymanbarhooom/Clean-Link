@@ -11,11 +11,13 @@ return new class extends Migration
         Schema::create('packages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
-            $table->string('name');
+            $table->string('name_ar');
+            $table->string('name_en');
             $table->integer('duration')->comment('in minutes');
             $table->decimal('price', 10, 2);
             $table->decimal('price_after_discount',10, 2)->nullable()->comment('calculated price after applying any service-level discount');
-            $table->json('details'); // Holds an array/list of strings
+            $table->json('details_ar'); // Holds an array/list of strings
+            $table->json('details_en'); // Holds an array/list of strings
             $table->timestamps();
         });
     }

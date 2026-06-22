@@ -3,7 +3,7 @@
 // database/seeders/AttributeSeeder.php
 namespace Database\Seeders;
 
-use App\Models\Attribute;
+use App\Models\AttributeModel;
 use Illuminate\Database\Seeder;
 
 class AttributeSeeder extends Seeder
@@ -250,7 +250,7 @@ class AttributeSeeder extends Seeder
         ];
 
         foreach ($attributes as $attribute) {
-            Attribute::create($attribute);
+            AttributeModel::create($attribute);
         }
     }
 }

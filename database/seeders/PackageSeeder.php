@@ -26,25 +26,35 @@ class PackageSeeder extends Seeder
                 // Package 1: Studio Layout
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'Studio Package',
+                    'name_ar' => 'باقة الاستوديو',
+                    'name_en' => 'Studio Package',
                     'duration' => max(45, intval($service->min_duration * 0.6)),
                     'price' => 80,
                     'price_after_discount' => $service->discount > 0 ? 80 - (80 * ($service->discount/100)) : 80,
-                    'details' => [
+                    'details_ar' => [
+                        'مثالية للمساحات التي تقل عن 60 متر مربع',
+                        'تشمل غرفتين وحمام واحد فقط',
+                    ],
+                    'details_en' => [
                         'Ideal for spaces under 60m²',
-                        'Includes 1 main living area & 1 bathroom refresh',
-                        'Basic surface dusting & floor disinfection'
+                        'Includes 2 rooms and 1 bathroom',
                     ],
                 ]);
 
                 // Package 2: Standard Flat Layout
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'Standard Flat Package',
+                    'name_ar' => 'باقة الشقة القياسية',
+                    'name_en' => 'Flat Package',
                     'duration' => intval(($service->min_duration + $service->max_duration) / 2),
                     'price' => 60,
                     'price_after_discount' => $service->discount > 0 ? 60 - (60 * ($service->discount/100)) : 60,
-                    'details' => [
+                    'details_ar' => [
+                        'تغطي الشقق العائلية العادية حتى 140 متر مربع',
+                        'تنظيف عميق لـ 3 غرف وحمامين مخصصين',
+                        'مسح وإزالة الدهون من الخزائن الخارجية للمطبخ'
+                    ],
+                    'details_en' => [
                         'Covers typical family flats up to 140m²',
                         'Deep wash of 3 rooms & 2 dedicated bathrooms',
                         'Kitchen outer cabinets grease wipe'
@@ -54,12 +64,18 @@ class PackageSeeder extends Seeder
                 // Package 3: Premium Multi-Story Building
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'Duplex & Building Package',
+                    'name_ar' => 'باقة الدوبلكس والمباني الكاملة',
+                    'name_en' => 'Duplex & Building Package',
                     'duration' => intval($service->max_duration * 1.5),
                     'price' => 108,
                     'price_after_discount' => $service->discount > 0 ? 108 - (108 * ($service->discount/100)) : 108,
-                    'details' => [
-                        'Suited for large duplex configurations or multi-story builds',
+                    'details_ar' => [
+                        'مناسبة للشقق الدوبلكس الكبيرة أو المباني متعددة الطوابق',
+                        'تشمل أكثر من 5 غرف، كنس السلالم، والشرفات',
+                        'تنظيف كامل لسطح المبنى وغسيل النوافذ الخارجية مع التلميع'
+                    ],
+                    'details_en' => [
+                        'Covers large duplexes and multi-story buildings',
                         'Includes 5+ rooms, staircase sweeping, and balconies',
                         'Complete roof boundary clearing & external window wash tint'
                     ],
@@ -72,11 +88,17 @@ class PackageSeeder extends Seeder
                 // Package 1: Small Sedan Frame
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'Sedan / Hatchback Tier',
+                    'name_ar' => 'فئة السيدان والهاتشباك',
+                    'name_en' => 'Sedan / Hatchback Tier',
                     'duration' => max(20, intval($service->min_duration * 0.8)),
                     'price' => 24,
                     'price_after_discount' => $service->discount > 0 ? (24 - (24 * ($service->discount/100))) : 24,
-                    'details' => [
+                    'details_ar' => [
+                        'مخصصة للسيارات الصغيرة وسيارات الركوب اليومية الكومبكت',
+                        'تنظيف وشفط الغبار من مقصورة السيارة المكونة من 4 مقاعد شائعة',
+                        'مسح لوحة القيادة (التابلوه) وتلميع الإطارات برذاذ مخصص'
+                    ],
+                    'details_en' => [
                         'Optimized for compact passenger vehicles & daily sedans',
                         'Standard 4-seat matching cabin vacuuming',
                         'Dashboard wipe down & tire gloss polish spray'
@@ -86,11 +108,17 @@ class PackageSeeder extends Seeder
                 // Package 2: Standard SUV Setup
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'SUV & Crossover Tier',
+                    'name_ar' => 'فئة السيارات العائلية والكروس أوفر (SUV)',
+                    'name_en' => 'SUV & Crossover Tier',
                     'duration' => intval(($service->min_duration + $service->max_duration) / 2),
                     'price' => 60,
-                    'price_after_discount' => $service->discount > 0 ?60 - (60 * ($service->discount/100)) : 60,
-                    'details' => [
+                    'price_after_discount' => $service->discount > 0 ? 60 - (60 * ($service->discount/100)) : 60,
+                    'details_ar' => [
+                        'مصممة خصيصاً لسيارات الكروس أوفر والسيارات العائلية التي تتسع لـ 5 إلى 7 ركاب',
+                        'تشمل إزالة الأوساخ والأتربة من صندوق الأمتعة الخلفي للمركبة',
+                        'غسيل الأرضيات وتطهير فتحات التكييف بعمق للتخلص من الروائح الكريهة'
+                    ],
+                    'details_en' => [
                         'Tailored specifically for 5 to 7 passenger crossover vehicles',
                         'Trunk storage debris extraction included',
                         'Mat washing & deep AC vent odor neutralizer application'
@@ -100,11 +128,17 @@ class PackageSeeder extends Seeder
                 // Package 3: Commercial Van or Luxury Elite Truck
                 Package::create([
                     'service_id' => $service->id,
-                    'name' => 'Large Van & Truck Elite Tier',
+                    'name_ar' => 'الفئة النخبوية للشاحنات والسيارات الفان الكبيرة',
+                    'name_en' => 'Large Van & Truck Elite Tier',
                     'duration' => intval($service->max_duration * 1.3),
                     'price' => 240,
-                    'price_after_discount' => $service->discount > 0 ?240 - (240 * ($service->discount/100)) : 240,
-                    'details' => [
+                    'price_after_discount' => $service->discount > 0 ? 240 - (240 * ($service->discount/100)) : 240,
+                    'details_ar' => [
+                        'مصممة لشاحنات البيك أب الكبيرة، وسيارات الدفع الرباعي الفاخرة، والفان متعددة الصفوف',
+                        'معالجة وترطيب كامل للجلد أو فرك عميق للمقاعد القماشية بالبخار',
+                        'تنظيف كامل وشامل لهيكل السيارة السفلي وإزالة الطين بنفاثات المياه'
+                    ],
+                    'details_en' => [
                         'Engineered for large pickup trucks, luxury 4x4s, and multi-row vans',
                         'Full leather treatment conditioning or heavy fabric steam scrubbing',
                         'Complete undercarriage mud jet blasting'

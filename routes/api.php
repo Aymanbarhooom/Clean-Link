@@ -6,6 +6,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyManagerController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PackageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\ServiceController;
@@ -105,6 +106,12 @@ Route::middleware('auth:sanctum')->group(function () {
 // 🧹 Core Clean Service Matrix Pathways
 // ==========================================
 Route::apiResource('services', ServiceController::class);
+Route::put('/services/{service}/attributes', [ServiceController::class, 'updateAttributes']);
+// ==========================================
+// 📦 Package Variants Catalogs Scope
+// ==========================================
+Route::apiResource('packages', PackageController::class);
+
 
 
 });
