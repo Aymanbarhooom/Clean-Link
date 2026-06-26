@@ -1,2 +1,8 @@
 *
 !.gitignore
+!categories/
+!categories/**
+!services/
+!services/**
+!companies/
+!companies/**
