@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ServiceResource;
 use App\Models\Service;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class ServiceController extends Controller
         }
 
         $services = $query->orderBy('rating', 'desc')->get();
-        return $this->successResponse($services, 'Services list successfully synchronized');
+        return $this->successResponse(ServiceResource::collection($services), 'Services list successfully synchronized');
     }
 
     /**
@@ -52,7 +53,7 @@ class ServiceController extends Controller
             'images'
         ]);
 
-        return $this->successResponse($service, 'Comprehensive service parameters aggregated');
+        return $this->successResponse(new ServiceResource($service), 'Comprehensive service parameters aggregated');
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RegionResource;
 use App\Models\Region;
 use App\Models\User;
 use App\Traits\ApiResponse;
@@ -104,7 +105,7 @@ class RegionController extends Controller
             return $this->errorResponse('Access mapping blocked', 403);
         }
 
-        return $this->successResponse($regions, 'Regions context retrieved');
+        return $this->successResponse(RegionResource::collection($regions), 'Regions context retrieved');
     }
 
     public function showRegion(Region $region): JsonResponse
@@ -112,7 +113,8 @@ class RegionController extends Controller
         $user = auth()->user();
         
         if ($user->isAdmin() || $user->role === 'client' || ($user->role === 'region_manager' && $region->manager_id === $user->id)) {
-            return $this->successResponse($region->load('manager', 'companies'), 'Region details retrieved');
+            $region->load('manager', 'companies');
+            return $this->successResponse(new RegionResource($region), 'Region details retrieved');
         }
 
         return $this->errorResponse('Access mapping blocked', 403);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
 use App\Traits\ApiResponse;
@@ -123,25 +124,38 @@ class CompanyController extends Controller
         return $this->successResponse($company, 'Company parameters modified successfully');
     }
 
-    public function getCompanies(): JsonResponse
-    {
-        $user = auth()->user();
+   public function getCompanies(): JsonResponse 
+{ 
+    $user = auth()->user(); 
+    
+    // High-density optimization using relational nested Eager Loading syntax matching clean data schemas 
+    $query = Company::with([
+        'region.manager'
+    ]); 
 
-        // High-density optimization using relational nested Eager Loading syntax matching clean data schemas
-        $query = Company::with([ 'manager', 'region.manager']);
+    if ($user->role === 'region_manager') { 
+        $query->whereHas('region', function ($q) use ($user) { 
+            $q->where('manager_id', $user->id); 
+        }); 
+    } elseif ($user->isCompanyManager()) { 
+        $query->where('manager_id', $user->id); 
+    } 
 
-        if ($user->role === 'region_manager') {
-            $query->whereHas('region', function ($q) use ($user) { $q->where('manager_id', $user->id); });
-        } elseif ($user->isCompanyManager()) {
-            $query->where('manager_id', $user->id);
-        }
+    // جلب البيانات أولاً من قاعدة البيانات
+    $companies = $query->get();
 
-        return $this->successResponse($query->get(), 'Companies list retrieved');
-    }
+    // تمرير البيانات عبر الـ Resource لضمان تطبيق شروط اللغة والـ whenLoaded
+    return $this->successResponse(
+        CompanyResource::collection($companies), 
+        'Companies list retrieved'
+    ); 
+}
+
     public function showCompany(Company $company): JsonResponse
     {
         $this->authorize('view', $company);
-        return $this->successResponse($company->load([ 'region', 'services']), 'Company profile retrieved');
+        $company->load(['region', 'services']);
+        return $this->successResponse(new CompanyResource($company), 'Company profile retrieved');
     }
 
     public function deleteCompany(Company $company): JsonResponse

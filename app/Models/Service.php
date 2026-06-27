@@ -38,16 +38,12 @@ class Service extends Model
         return $this->hasMany(Package::class);
     }
 
-    /**
-     * Many-to-Many connection mapping custom attribute pricing schemas.
-     */
     public function attributes(): BelongsToMany
     {
         return $this->belongsToMany(AttributeModel::class, 'attribute_service', 'service_id', 'attribute_id')
             ->withPivot('price', 'duration')
             ->withTimestamps();
     }
-
 
     public function reviews(): MorphMany
     {
