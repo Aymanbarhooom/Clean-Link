@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AttributeResource;
 use App\Models\Attribute;
 use App\Models\AttributeModel;
 use App\Traits\ApiResponse;
@@ -26,7 +27,7 @@ class AttributeController extends Controller
     public function index(): JsonResponse
     {
         $attributes = AttributeModel::orderBy('created_at', 'desc')->get();
-        return $this->successResponse($attributes, 'Global attribute dictionary retrieved successfully');
+        return $this->successResponse(AttributeResource::collection($attributes), 'Global attribute dictionary retrieved successfully');
     }
 
     /**

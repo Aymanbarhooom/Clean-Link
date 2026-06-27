@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -20,12 +21,13 @@ class CategoryController extends Controller
     public function index(): JsonResponse
     {
         $categories = Category::all();
-        return $this->successResponse($categories, 'Categories matrix retrieved successfully');
+        return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
     }
 
     public function show(Category $category): JsonResponse
     {
-        return $this->successResponse($category->load('services'), 'Category specific parameters loaded');
+        $category->load('services');
+        return $this->successResponse(new CategoryResource($category), 'Category specific parameters loaded');
     }
 
     public function store(Request $request): JsonResponse

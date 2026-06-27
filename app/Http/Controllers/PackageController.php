@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PackageResource;
 use App\Models\Package;
 use App\Models\Service;
 use App\Traits\ApiResponse;
@@ -32,7 +33,7 @@ class PackageController extends Controller
             ->orderBy('price', 'asc')
             ->get();
 
-        return $this->successResponse($packages, 'Service variant packages retrieved successfully');
+        return $this->successResponse(PackageResource::collection($packages), 'Service variant packages retrieved successfully');
     }
 
     /**
@@ -41,7 +42,8 @@ class PackageController extends Controller
      */
     public function show(Package $package): JsonResponse
     {
-        return $this->successResponse($package->load('service.company', 'service'), 'Package meta specifications loaded');
+        $package->load('service.company', 'service');
+        return $this->successResponse(new PackageResource($package), 'Package meta specifications loaded');
     }
 
     /**

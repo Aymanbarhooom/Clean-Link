@@ -4,6 +4,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryResource;
+use App\Http\Resources\CompanyResource;
+use App\Http\Resources\ServiceResource;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Service;
@@ -40,12 +43,12 @@ class HomeController extends Controller
         ->get();
 
     // Aggregate inside a structured layout matching your frontend requirement
-    return $this->successResponse([
-        'offers' => $offers,
-        'services' => $topServices,
-        'categories' => $categories,
-        'companies' => $topCompanies,
-    ], 'Home page aggregates loaded successfully');
-}
+    return $this->successResponse([ 
+            'offers'     => ServiceResource::collection($offers), 
+            'services'   => ServiceResource::collection($topServices), 
+            'categories' => CategoryResource::collection($categories), 
+            'companies'  => CompanyResource::collection($topCompanies), 
+        ], 'Home page aggregates loaded successfully'); 
+    } 
 
 }
