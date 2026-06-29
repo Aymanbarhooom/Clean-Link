@@ -23,9 +23,19 @@ class WorkerProfileController extends Controller
      */
     public function show(User $worker): JsonResponse
     {
- 
+        $worker = auth()->user();
+        if (!$worker->isWorker()) {
+            return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
+        }
         $profile = $worker->workerProfile()->with('user.profile')->first();
         return $this->successResponse($profile, 'Worker extension record structure retrieved');
+    }
+
+    public function showOwn(): JsonResponse
+    {
+        $worker = auth()->user();
+        $profile = $worker->workerProfile()->with('user.profile')->first();
+        return $this->successResponse($profile, 'Your profile retrieved');
     }
 
     /**
@@ -33,8 +43,8 @@ class WorkerProfileController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-       $worker = auth()->user();
-       if(!$worker->isWorker()) {
+        $worker = auth()->user();
+        if (!$worker->isWorker()) {
             return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
         }
 
@@ -47,7 +57,7 @@ class WorkerProfileController extends Controller
         ]);
 
         return $this->successResponse(
-            $worker->load(['profile', 'workerProfile']), 
+            $worker->load(['profile', 'workerProfile']),
             'Worker professional operational metric parameters adjusted'
         );
     }

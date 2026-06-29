@@ -93,6 +93,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::prefix('worker-profiles')->group(function () {
         Route::get('/{worker}', [WorkerProfileController::class, 'show']);
+        Route::get('/me', [WorkerProfileController::class, 'showOwn']);
         Route::put('/', [WorkerProfileController::class, 'update']);
     });
     // ==========================================
