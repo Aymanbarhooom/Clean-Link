@@ -35,6 +35,8 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('/home-page', [HomeController::class, 'index']);
+Route::get('/search', [HomeController::class, 'search']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
 

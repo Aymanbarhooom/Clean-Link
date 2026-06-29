@@ -41,10 +41,13 @@ class ProfileController extends Controller
 
         // Validate the incoming request data
         $validated = $request->validate([
-            'image' => 'nullable|string',
             'address' => 'nullable|string|max:500',
             'phone' => 'nullable|string|max:30',
         ]);
+        if($request->hasFile('image')) {
+            $path = $request->file('image')->store('profiles', 'public');
+            $validated['image'] = $path;
+        }
 
         // Update the profile with validated data
         $profile->update($validated);
