@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AttributeSeeder::class,
             ServiceSeeder::class,
             PackageSeeder::class,
+            ServiceImageSeeder::class,
         ]);
     }
 }
