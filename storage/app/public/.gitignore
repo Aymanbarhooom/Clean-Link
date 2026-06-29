@@ -10,3 +10,5 @@
 !regions/**
 !service-images/
 !service-images/**
+!worker-images/
+!worker-images/**

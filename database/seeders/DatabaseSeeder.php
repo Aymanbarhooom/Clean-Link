@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+
+use App\Models\Skill;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -18,10 +20,12 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             CompanySeeder::class,
             AttributeSeeder::class,
+            SkillSeeder::class,
             ServiceSeeder::class,
             PackageSeeder::class,
             ServiceImageSeeder::class,
-            WorkerSeeder::class,
+            ReviewSeeder::class,
+            WorkerSeeder::class
         ]);
     }
 }

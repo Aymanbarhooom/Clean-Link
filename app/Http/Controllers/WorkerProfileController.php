@@ -27,14 +27,14 @@ class WorkerProfileController extends Controller
         if (!$worker->isWorker()) {
             return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
         }
-        $profile = $worker->workerProfile()->with('user.profile')->first();
+        $profile = $worker->workerProfile()->with('user.profile','skills')->first();
         return $this->successResponse($profile, 'Worker extension record structure retrieved');
     }
 
     public function showOwn(): JsonResponse
     {
         $worker = auth()->user();
-        $profile = $worker->workerProfile()->with('user.profile')->first();
+        $profile = $worker->workerProfile()->with('user.profile','skills')->first();
         return $this->successResponse($profile, 'Your profile retrieved');
     }
 
@@ -61,4 +61,33 @@ class WorkerProfileController extends Controller
             'Worker professional operational metric parameters adjusted'
         );
     }
+
+        /**
+     * Attach multiple operational skills to a specific field worker.
+     * Route: POST /api/workers/{worker}/skills
+     */
+    public function attachSkills(Request $request): JsonResponse
+    {
+        $worker = auth()->user();
+        if (!$worker->isWorker()) {
+            return $this->errorResponse('Target profile identity is not a registered worker', 422);
+        }
+
+        // Verify that the logged-in Company Manager manages this specific worker
+        $this->authorize('update', $worker);
+
+        $validated = $request->validate([
+            'skill_ids' => 'required|array|min:1',
+            'skill_ids.*' => 'required|integer|exists:skills,id',
+        ]);
+
+        // Access the workerProfile model extension directly to bridge the pivot table relation mapping
+        $worker->workerProfile->skills()->syncWithoutDetaching($validated['skill_ids']);
+
+        return $this->successResponse(
+            $worker->load(['workerProfile.skills', 'profile']), 
+            'Skills assigned to the worker profile successfully'
+        );
+    }
+
 }
