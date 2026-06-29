@@ -60,7 +60,7 @@ class WorkerSeeder extends Seeder
 
         // 5. Assign 10 workers to each of the 10 companies
         foreach ($companies as $company) {
-            $this->command->info('Adding $company company workers distributed across 10 companies!');
+           $this->command->info("Adding $company->id company workers distributed across 10 companies!");
             for ($i = 0; $i < 10; $i++) {
                 $currentFullName = $fullNames[$nameIndex];
                 

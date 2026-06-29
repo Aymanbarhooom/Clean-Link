@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyManagerController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\ProfileController;
@@ -115,6 +116,13 @@ Route::middleware('auth:sanctum')->group(function () {
 // ==========================================
     Route::post('services/{service}/skills', [ServiceController::class, 'attachSkills']);
     Route::post('workers/skills', [CompanyManagerController::class, 'attachSkills']);
+// ==========================================
+// ❤️ ميزة المفضلة الموحدة (Favorites Engine)
+// ==========================================
+Route::prefix('favorites')->group(function () {
+    Route::get('/', [FavoriteController::class, 'index']);
+    Route::post('/toggle', [FavoriteController::class, 'toggleFavorite']);
+});
 
 
 });

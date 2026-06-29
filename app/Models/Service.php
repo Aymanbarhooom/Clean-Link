@@ -54,9 +54,14 @@ class Service extends Model
         return $this->hasMany(ServiceImage::class);
     }
     public function requiredSkills(): BelongsToMany
-{
-    return $this->belongsToMany(Skill::class, 'service_skills')->withTimestamps();
-}
+    {
+        return $this->belongsToMany(Skill::class, 'service_skills')->withTimestamps();
+    }
+    public function favoritedBy(): MorphMany
+    {
+        return $this->morphMany(Favorite::class, 'favoritable');
+    }
+
 
 
     // --- Helper Functions ---
@@ -74,10 +79,10 @@ class Service extends Model
     {
         return $this->belongsTo(Category::class);
     }
-     protected function image(): Attribute
+    protected function image(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ? asset('storage/' . $value) : null,
+            get: fn($value) => $value ? asset('storage/' . $value) : null,
         );
     }
 }
