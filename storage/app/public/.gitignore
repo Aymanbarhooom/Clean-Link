@@ -6,3 +6,7 @@
 !services/**
 !companies/
 !companies/**
+!regions/
+!regions/**
+!service-images/
+!service-images/**
