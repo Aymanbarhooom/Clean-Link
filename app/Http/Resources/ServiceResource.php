@@ -33,7 +33,7 @@ class ServiceResource extends JsonResource
         'company' => new CompanyResource($this->whenLoaded('company')),
         'packages' => PackageResource::collection($this->whenLoaded('packages')),
         'attributes' => AttributeResource::collection($this->whenLoaded('attributes')),
-        'images' => $this->whenLoaded('images'), 
+        'images' => ServiceImageResource::collection($this->whenLoaded('images')), 
         'reviews' => $this->whenLoaded('reviews'),
 
         'created_at' => $this->created_at,

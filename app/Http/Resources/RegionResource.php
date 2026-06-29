@@ -20,6 +20,7 @@ class RegionResource extends JsonResource
         'id' => $this->id,
         'name' => $this->{"name_$lang"},
         'manager_id' => $this->manager_id,
+        'image' => $this->image,
 
         'manager' => $this->whenLoaded('manager'),
         'companies' => CompanyResource::collection($this->whenLoaded('companies')),

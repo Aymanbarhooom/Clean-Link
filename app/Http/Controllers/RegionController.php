@@ -73,6 +73,10 @@ class RegionController extends Controller
             'name_en' => 'required|string',
             'manager_id' => 'required|exists:users,id',
         ]);
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('regions', 'public');
+            $validated['image'] = $path;
+        }
 
         $region = Region::create($validated);
         return $this->successResponse($region, 'Region created successfully', 211);
@@ -88,7 +92,10 @@ class RegionController extends Controller
             'name_ar' => 'sometimes|required|string',
             'name_en' => 'sometimes|required|string',
         ]);
-
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('regions', 'public');
+            $validated['image'] = $path;
+        }
         $region->update($validated);
         return $this->successResponse($region, 'Region updated successfully');
     }

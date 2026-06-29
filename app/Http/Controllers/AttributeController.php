@@ -24,9 +24,11 @@ class AttributeController extends Controller
      * Display a listing of all global attributes.
      * Useful for Company Managers when setting up custom prices.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $attributes = AttributeModel::orderBy('created_at', 'desc')->get();
+        $perPage = $request->integer('per_page', 10);
+        $perPage = max(1, min($perPage, 100));
+        $attributes = AttributeModel::orderBy('created_at', 'desc')->paginate($perPage);
         return $this->successResponse(AttributeResource::collection($attributes), 'Global attribute dictionary retrieved successfully');
     }
 

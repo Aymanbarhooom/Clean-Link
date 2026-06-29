@@ -18,24 +18,33 @@ class CategoryController extends Controller
         $this->middleware('auth:sanctum')->except(['index', 'show']);
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $categories = Category::all();
+        $perPage = $request->integer('per_page', 10);
+        $perPage = max(1, min($perPage, 100));
+        $categories = Category::paginate($perPage);
         return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
     }
 
-    public function show(Category $category): JsonResponse
+    public function show(Request $request, Category $category): JsonResponse
     {
-        $category->load('services');
+        $perPage = $request->integer('per_page', 10);
+        $perPage = max(1, min($perPage, 100));
+
+        $services = $category->services()->paginate($perPage);
+
+        $category->setRelation('services', $services);
+
         return $this->successResponse(new CategoryResource($category), 'Category specific parameters loaded');
     }
+
 
     public function store(Request $request): JsonResponse
     {
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-        if($request->hasFile('image')) {
+        if ($request->hasFile('image')) {
             $path = $request->file('image')->store('category_images', 'public');
             $validated['image'] = $path;
         }
@@ -55,7 +64,7 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-        if($request->hasFile('image')) {
+        if ($request->hasFile('image')) {
             $path = $request->file('image')->store('category_images', 'public');
             $validated['image'] = $path;
         }

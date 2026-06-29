@@ -43,9 +43,7 @@ class ServiceController extends Controller
      */
     public function show(Service $service): JsonResponse
     {
-        // Clean schema eager-loading matching your architectural workflow parameters
         $service->load([
-            'company', 
             'company', 
             'packages', 
             'attributes',
