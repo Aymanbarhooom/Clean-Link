@@ -9,7 +9,9 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SkillController;
 use App\Http\Controllers\WorkerProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,10 +35,6 @@ Route::prefix('auth')->group(function () {
         Route::put('/change-password', [AuthController::class, 'changePassword']);
     });
 });
-
-Route::get('/home-page', [HomeController::class, 'index']);
-Route::get('/search', [HomeController::class, 'search']);
-
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -66,10 +64,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Specialized Corporate Leaders Mapping Roles
         Route::post('/managers', [CompanyController::class, 'addManager']);
-       
+
         Route::delete('/managers/{manager}', [CompanyController::class, 'deleteManager']);
     });
-     Route::get('/company/managers', [CompanyController::class, 'getManagers']);
+    Route::get('/company/managers', [CompanyController::class, 'getManagers']);
 
     //  Field Workers Management Scope (Company Manager Operations)
     Route::prefix('workers')->group(function () {
@@ -78,14 +76,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{worker}', [CompanyManagerController::class, 'updateWorker']);
         Route::delete('/{worker}', [CompanyManagerController::class, 'deleteWorker']);
     });
-    // ==========================================
-    // 🗂️ Categories Registry Pathways
-    // ==========================================
+
     Route::apiResource('categories', CategoryController::class);
 
-    // ==========================================
-    // 👥 Identity Profile Operations Boundaries
-    // ==========================================
+
     Route::prefix('profile')->group(function () {
         Route::get('/', [ProfileController::class, 'show']);
         Route::put('/', [ProfileController::class, 'update']);
@@ -96,25 +90,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/me', [WorkerProfileController::class, 'showOwn']);
         Route::put('/', [WorkerProfileController::class, 'update']);
     });
-    // ==========================================
-// 📊 Global Attribute Dictionary Pathways
-// ==========================================
+
     Route::prefix('attributes')->group(function () {
-    Route::get('/', [AttributeController::class, 'index']);      // Accessible to Admin & Company Managers
-    Route::post('/', [AttributeController::class, 'store']);     // Admin only
-    Route::delete('/{attribute}', [AttributeController::class, 'destroy']); // Admin only
-});
+        Route::get('/', [AttributeController::class, 'index']);      // Accessible to Admin & Company Managers
+        Route::post('/', [AttributeController::class, 'store']);     // Admin only
+        Route::delete('/{attribute}', [AttributeController::class, 'destroy']); // Admin only
+    });
 
-// ==========================================
-// 🧹 Core Clean Service Matrix Pathways
-// ==========================================
-Route::apiResource('services', ServiceController::class);
-Route::put('/services/{service}/attributes', [ServiceController::class, 'updateAttributes']);
-// ==========================================
-// 📦 Package Variants Catalogs Scope
-// ==========================================
-Route::apiResource('packages', PackageController::class);
 
+    Route::apiResource('services', ServiceController::class);
+    Route::put('/services/{service}/attributes', [ServiceController::class, 'updateAttributes']);
+
+    Route::apiResource('packages', PackageController::class);
+    Route::post('reviews', [ReviewController::class, 'store']);
+
+    Route::get('/home-page', [HomeController::class, 'index']);
+    Route::get('/search', [HomeController::class, 'search']);
+
+    Route::get('skills', [SkillController::class, 'index']);
+    Route::post('skills', [SkillController::class, 'store']);
+
+    // ==========================================
+// 🎓 Dynamic Skill Assignment Mapping Routes
+// ==========================================
+    Route::post('services/{service}/skills', [ServiceController::class, 'attachSkills']);
+    Route::post('workers/skills', [CompanyManagerController::class, 'attachSkills']);
 
 
 });

@@ -47,8 +47,9 @@ class ServiceController extends Controller
             'company', 
             'packages', 
             'attributes',
-            'reviews',
-            'images'
+            'reviews.client.profile',
+            'images',
+            'requiredSkills'
         ]);
 
         return $this->successResponse(new ServiceResource($service), 'Comprehensive service parameters aggregated');
@@ -222,5 +223,29 @@ class ServiceController extends Controller
             'Service attributes list successfully replaced'
         );
     }
+
+        /**
+     * Attach multiple competency skills to a specific service.
+     * Route: POST /api/services/{service}/skills
+     */
+    public function attachSkills(Request $request, Service $service): JsonResponse
+    {
+        // Enforce policy protection ensuring only the managing Company Manager can update this service
+        $this->authorize('update', $service);
+
+        $validated = $request->validate([
+            'skill_ids' => 'required|array|min:1',
+            'skill_ids.*' => 'required|integer|exists:skills,id',
+        ]);
+
+        // syncWithoutDetaching prevents duplicate pivot table entries if a skill is re-submitted
+        $service->requiredSkills()->syncWithoutDetaching($validated['skill_ids']);
+
+        return $this->successResponse(
+            $service->load('requiredSkills'), 
+            'Skills attached to the service successfully'
+        );
+    }
+ 
 }
 

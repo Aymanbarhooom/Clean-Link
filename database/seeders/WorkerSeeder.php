@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Profile;
 use App\Models\Company;
 use App\Models\WorkerProfile;
+use App\Models\Skill;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
@@ -40,11 +41,26 @@ class WorkerSeeder extends Seeder
         // 3. Keep exactly 100 names as requested
         $fullNames = array_slice($fullNames, 0, 100);
 
+        //workers images
+        $workerImagePaths = [
+            'worker_profiles/worker1.jpg',
+            'worker_profiles/worker2.jpg',
+            'worker_profiles/worker3.jpg',
+            'worker_profiles/worker4.jpg',
+            'worker_profiles/worker5.jpg',
+            'worker_profiles/worker6.jpg',
+            'worker_profiles/worker7.jpg',
+            'worker_profiles/worker8.jpg',
+            'worker_profiles/worker9.jpg',
+            'worker_profiles/worker10.jpg',
+        ];
+
         // 4. Counter to track position in our 100-name list
         $nameIndex = 0;
 
         // 5. Assign 10 workers to each of the 10 companies
         foreach ($companies as $company) {
+            $this->command->info('Adding $company company workers distributed across 10 companies!');
             for ($i = 0; $i < 10; $i++) {
                 $currentFullName = $fullNames[$nameIndex];
                 
@@ -63,18 +79,33 @@ class WorkerSeeder extends Seeder
                 // Step B: Create default profile linked to user
                 Profile::create([
                     'user_id' => $user->id,
-                    'image'   => null, // Handled by your model's null/storage asset accessor
+                    'image'   => $workerImagePaths[$nameIndex % count($workerImagePaths)],
                     'address' => 'Street ' . rand(1, 100) . ', Cairo, Egypt',
                     'phone'   => '+201' . rand(0, 2) . rand(10000000, 99999999),
                 ]);
 
                 // Step C: Create Worker profile linking user to current company
-                WorkerProfile::create([
+                $workerProfile = WorkerProfile::create([
                     'user_id'          => $user->id,
                     'company_id'       => $company->id,
                     'experience_years' => rand(1, 15),
                     'rating'           => rand(30, 50) / 10, 
                 ]);
+
+                // Step D: Attach 3 random skills to the worker
+                $allSkills = Skill::pluck('id')->toArray();
+                if (!empty($allSkills)) {
+                    $randomSkills = array_slice($allSkills, 0, min(3, count($allSkills)));
+                    if (count($randomSkills) < 3) {
+                        // If fewer than 3 skills exist, shuffle and use what's available
+                        $randomSkills = $allSkills;
+                    } else {
+                        // Get 3 random skills
+                        shuffle($allSkills);
+                        $randomSkills = array_slice($allSkills, 0, 3);
+                    }
+                    $workerProfile->skills()->attach($randomSkills);
+                }
 
                 $nameIndex++;
             }

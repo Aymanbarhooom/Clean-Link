@@ -53,6 +53,11 @@ class Service extends Model
     {
         return $this->hasMany(ServiceImage::class);
     }
+    public function requiredSkills(): BelongsToMany
+{
+    return $this->belongsToMany(Skill::class, 'service_skills')->withTimestamps();
+}
+
 
     // --- Helper Functions ---
 
