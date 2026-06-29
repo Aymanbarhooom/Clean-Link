@@ -149,12 +149,12 @@ class CompanyController extends Controller
         CompanyResource::collection($companies), 
         'Companies list retrieved'
     ); 
-}
+} 
 
     public function showCompany(Company $company): JsonResponse
     {
         $this->authorize('view', $company);
-        $company->load(['region', 'services']);
+        $company->load(['region', 'services','workers.user', 'reviews']); 
         return $this->successResponse(new CompanyResource($company), 'Company profile retrieved');
     }
 

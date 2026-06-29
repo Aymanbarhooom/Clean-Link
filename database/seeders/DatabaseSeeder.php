@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             ServiceSeeder::class,
             PackageSeeder::class,
             ServiceImageSeeder::class,
+            WorkerSeeder::class,
         ]);
     }
 }
