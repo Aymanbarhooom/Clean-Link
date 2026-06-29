@@ -12,16 +12,32 @@ use Carbon\Carbon;
 class Company extends Model
 {
     protected $fillable = [
-         'manager_id', 'region_id', 'name_ar', 'name_en', 
-        'description_ar', 'description_en', 'image', 
-        'location_ar', 'location_en', 'rating', 'is_open', 'start_hour', 'close_hour'
+        'manager_id',
+        'region_id',
+        'name_ar',
+        'name_en',
+        'description_ar',
+        'description_en',
+        'image',
+        'location_ar',
+        'location_en',
+        'rating',
+        'is_open',
+        'start_hour',
+        'close_hour'
     ];
 
-    
+
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id');
     }
+
+    public function favoritedBy(): MorphMany
+    {
+        return $this->morphMany(Favorite::class, 'favoritable');
+    }
+
 
     public function region(): BelongsTo
     {
@@ -52,8 +68,10 @@ class Company extends Model
      */
     public function isCurrentlyOperating(): bool
     {
-        if (!$this->is_open) return false;
-        if (!$this->start_hour || !$this->close_hour) return true;
+        if (!$this->is_open)
+            return false;
+        if (!$this->start_hour || !$this->close_hour)
+            return true;
 
         $now = Carbon::now();
         $start = Carbon::createFromTimeString($this->start_hour);
@@ -67,9 +85,9 @@ class Company extends Model
         $this->update(['rating' => $this->reviews()->avg('rating') ?? 0.00]);
     }
     protected function image(): Attribute
-{
-    return Attribute::make(
-        get: fn ($value) => $value ? asset('storage/' . $value) : null,
-    );
-}
+    {
+        return Attribute::make(
+            get: fn($value) => $value ? asset('storage/' . $value) : null,
+        );
+    }
 }

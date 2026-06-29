@@ -48,6 +48,12 @@ class User extends Authenticatable
         return $this->hasMany(Task::class, 'worker_id');
     }
 
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
+
     // --- Helper Functions ---
 
     public function isAdmin(): bool
@@ -64,7 +70,7 @@ class User extends Authenticatable
     {
         return $this->role === 'company_manager';
     }
-    public function fcmTokens():  HasMany
+    public function fcmTokens(): HasMany
     {
         return $this->hasMany(FcmToken::class);
     }
