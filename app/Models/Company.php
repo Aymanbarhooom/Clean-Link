@@ -22,9 +22,6 @@ class Company extends Model
         'location_ar',
         'location_en',
         'rating',
-        'is_open',
-        'start_hour',
-        'close_hour'
     ];
 
 
@@ -48,6 +45,11 @@ class Company extends Model
     {
         return $this->hasMany(Service::class);
     }
+    public function workTimes() {
+        return $this->hasMany(WorkTime::class);
+    }
+
+
 
     /**
      * Polymorphic Relationship for Company Reviews

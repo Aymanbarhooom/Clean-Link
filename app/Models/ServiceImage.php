@@ -10,14 +10,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class ServiceImage extends Model 
 {
-    protected $fillable = ['service_id', 'name', 'images'];
-
-    /**
-     * Automatic JSON casting conversion for array handling structures.
-     */
-    protected $casts = [
-        'images' => 'array'
-    ];
+    protected $fillable = ['service_id', 'image_before', 'image_after'];
 
     public function service(): BelongsTo
     {

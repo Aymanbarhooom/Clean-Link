@@ -71,35 +71,55 @@ class CompanyController extends Controller
     // --- Company Asset Profiles Section ---
 
     public function addCompany(Request $request): JsonResponse
-    {
-        $this->authorize('create', Company::class);
-        if($request->hasFile('image')) {
-            $path = $request->file('image')->store('company_images', 'public');
-            $validated['image'] = $path;
-        }
-        $validated = $request->validate([
-            'manager_id' => 'required|exists:users,id',
-            'region_id' => 'required|exists:regions,id',
-            'name_ar' => 'required|string',
-            'name_en' => 'required|string',
-            'description_ar' => 'nullable|string',
-            'description_en' => 'nullable|string',
-            'location_ar' => 'nullable|string',
-            'location_en' => 'nullable|string',
-            'start_hour' => 'nullable|date_format:H:i',
-            'close_hour' => 'nullable|date_format:H:i',
-        ]);
+{
+    $this->authorize('create', Company::class);
 
-        // Enforcement: Ensure Region Manager assigns only within his territory scope
-        $user = auth()->user();
-        if ($user->role === 'region_manager') {
-            $ownsRegion = $user->managedRegions()->where('id', $validated['region_id'])->exists();
-            if (!$ownsRegion) return $this->errorResponse('Cannot deploy cross-boundary companies tracking rules', 403);
-        }
+    $validated = $request->validate([
+        'manager_id' => 'required|exists:users,id',
+        'region_id' => 'required|exists:regions,id',
+        'name_ar' => 'required|string',
+        'name_en' => 'required|string',
+        'description_ar' => 'nullable|string',
+        'description_en' => 'nullable|string',
+        'location_ar' => 'nullable|string',
+        'location_en' => 'nullable|string',
+        'image' => 'nullable|image|max:2048'
+    ]);
 
-        $company = Company::create($validated);
-        return $this->successResponse($company, 'Company operational profile built', 211);
+    if ($request->hasFile('image')) {
+        $validated['image'] = $request->file('image')->store('company_images', 'public');
     }
+
+    $user = auth()->user();
+    if ($user->role === 'region_manager') {
+        if (!$user->managedRegions()->where('id', $validated['region_id'])->exists()) {
+            return $this->errorResponse('Cannot deploy cross-boundary companies tracking rules', 403);
+        }
+    }
+
+    $company = Company::create($validated);
+
+    $workDays = [];
+    for ($day = 0; $day <= 6; $day++) {
+        $isHoliday = ($day == 5 || $day == 6); 
+        
+        $workDays[] = [
+            'company_id' => $company->id,
+            'day_of_week' => $day,
+            'open_at'     => $isHoliday ? null : '08:00:00',
+            'close_at'    => $isHoliday ? null : '16:00:00',
+            'is_holiday'  => $isHoliday,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ];
+    }
+
+    // استخدام insert لعملية إضافة سريعة (Bulk Insert)
+    \App\Models\WorkTime::insert($workDays);
+
+    return $this->successResponse($company, 'Company operational profile built', 211);
+}
+
 
     public function updateCompany(Request $request, Company $company): JsonResponse
     {
@@ -115,9 +135,6 @@ class CompanyController extends Controller
             'description_en' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
-            'is_open' => 'sometimes|boolean',
-            'start_hour' => 'nullable|date_format:H:i',
-            'close_hour' => 'nullable|date_format:H:i',
         ]);
 
         $company->update($validated);

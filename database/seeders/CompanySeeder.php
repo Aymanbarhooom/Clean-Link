@@ -33,9 +33,6 @@ class CompanySeeder extends Seeder
             'location_ar' => 'دمشق - المزة',
             'location_en' => 'Damascus - Mazzeh',
             'rating' => 5.00,
-            'is_open' => true,
-            'start_hour' => '08:00',
-            'close_hour' => '22:00',
         ],
         [
             'manager_id' => $managers[1]->id,
@@ -48,9 +45,6 @@ class CompanySeeder extends Seeder
             'location_ar' => 'حلب - الشهباء',
             'location_en' => 'Aleppo - Al-Shahbaa',
             'rating' => 4.80,
-            'is_open' => true,
-            'start_hour' => '09:00',
-            'close_hour' => '23:00',
         ],
         [
             'manager_id' => $managers[0]->id,
@@ -63,9 +57,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'حمص - جورة الشياح',
             'location_en' => 'Homs - Jouret al-Shayah',
             'rating' => 3.50, // تقييم متوسط
-            'is_open' => true,
-            'start_hour' => '08:00',
-            'close_hour' => '20:00',
+
         ],
         [
             'manager_id' => $managers[1]->id,
@@ -78,9 +70,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'اللاذقية - الكورنيش',
             'location_en' => 'Lattakia - Corniche',
             'rating' => 4.20,
-            'is_open' => true,
-            'start_hour' => '07:00',
-            'close_hour' => '17:00',
+    
         ],
         [
             'manager_id' => $managers[0]->id,
@@ -93,9 +83,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'دمشق - مشروع دمر',
             'location_en' => 'Damascus - Dummar Project',
             'rating' => 4.90,
-            'is_open' => true,
-            'start_hour' => '09:00',
-            'close_hour' => '21:00',
+   
         ],
         [
             'manager_id' => $managers[1]->id,
@@ -108,9 +96,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'حلب - حي الفرقان',
             'location_en' => 'Aleppo - Al-Furqan',
             'rating' => 3.10, // تقييم قليل
-            'is_open' => false, // مغلقة حالياً للتجربة
-            'start_hour' => '08:00',
-            'close_hour' => '16:00',
+         
         ],
         [
             'manager_id' => $managers[0]->id,
@@ -123,9 +109,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'حمص - طريق الشام',
             'location_en' => 'Homs - Damascus Road',
             'rating' => 4.50,
-            'is_open' => true,
-            'start_hour' => '10:00',
-            'close_hour' => '20:00',
+   
         ],
         [
             'manager_id' => $managers[1]->id,
@@ -138,9 +122,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'اللاذقية - جبلة',
             'location_en' => 'Lattakia - Jableh',
             'rating' => 4.00,
-            'is_open' => true,
-            'start_hour' => '07:30',
-            'close_hour' => '18:00',
+
         ],
         [
             'manager_id' => $managers[0]->id,
@@ -153,9 +135,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'دمشق - كفرسوسة',
             'location_en' => 'Damascus - Kafr Sousa',
             'rating' => 4.75,
-            'is_open' => true,
-            'start_hour' => '00:00', // تعمل 24 ساعة
-            'close_hour' => '23:59',
+
         ],
         [
             'manager_id' => $managers[1]->id,
@@ -168,9 +148,7 @@ class CompanySeeder extends Seeder
             'location_ar' => 'حلب - السليمانية',
             'location_en' => 'Aleppo - Sulaymaniyah',
             'rating' => 2.90, // تقييم قليل جداً
-            'is_open' => true,
-            'start_hour' => '08:00',
-            'close_hour' => '18:00',
+     
         ],
     ];
 
