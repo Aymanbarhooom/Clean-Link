@@ -22,26 +22,26 @@ class ServiceImageSeeder extends Seeder
                 
                 ServiceImage::create([
                     'service_id' => $service->id,
-                    'name' => 'Home Gallery Overview',
-                    // Maps 3 specific home images located in your public workspace
-                    'images' => [ 
-                        'service_secondary/home_living.jpg',
-                        'service_secondary/home_kitchen.jpg',
-                        'service_secondary/home_bathroom.jpg'
-                    ]
+                    'image_before' => 'service_secondary/home_bathroom.jpg',
+                    'image_after' => 'service_secondary/home_kitchen.jpg',
+                ]);
+                ServiceImage::create([
+                    'service_id' => $service->id,
+                    'image_before' => 'service_secondary/home_living.jpg',
+                    'image_after' => 'service_secondary/home_bathroom.jpg',
                 ]);
 
             } elseif ($service->category_id === $carWash?->id || $service->company?->category_id === $carWash?->id) {
                 
                 ServiceImage::create([
                     'service_id' => $service->id,
-                    'name' => 'Car Detailing Gallery Overview',
-                    // Maps 3 alternative automotive images located in your public workspace
-                    'images' => [
-                        'service_secondary/car_interior.jpg',
-                        'service_secondary/car_wheels.jpg',
-                        'service_secondary/car_foam.jpg'
-                    ]
+                    'image_before' => 'service_secondary/car_foam.jpg',
+                    'image_after' => 'service_secondary/car_interior.jpg',
+                ]);
+                ServiceImage::create([
+                    'service_id' => $service->id,
+                    'image_before' => 'service_secondary/car_wheels.jpg',
+                    'image_after' => 'service_secondary/car_foam.jpg',
                 ]);
             }
         }

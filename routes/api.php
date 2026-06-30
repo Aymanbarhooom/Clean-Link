@@ -12,6 +12,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\ServiceImageController;
 use App\Http\Controllers\SkillController;
 use App\Http\Controllers\WorkerProfileController;
 use Illuminate\Support\Facades\Route;
@@ -107,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/home-page', [HomeController::class, 'index']);
     Route::get('/search', [HomeController::class, 'search']);
+    Route::get('/offers', [HomeController::class, 'getoffers']);
 
     Route::get('skills', [SkillController::class, 'index']);
     Route::post('skills', [SkillController::class, 'store']);
@@ -116,13 +118,15 @@ Route::middleware('auth:sanctum')->group(function () {
 // ==========================================
     Route::post('services/{service}/skills', [ServiceController::class, 'attachSkills']);
     Route::post('workers/skills', [CompanyManagerController::class, 'attachSkills']);
-// ==========================================
+    // ==========================================
 // ❤️ ميزة المفضلة الموحدة (Favorites Engine)
 // ==========================================
-Route::prefix('favorites')->group(function () {
-    Route::get('/', [FavoriteController::class, 'index']);
-    Route::post('/toggle', [FavoriteController::class, 'toggleFavorite']);
-});
+    Route::prefix('favorites')->group(function () {
+        Route::get('/', [FavoriteController::class, 'index']);
+        Route::post('/toggle', [FavoriteController::class, 'toggleFavorite']);
+    });
 
+    Route::post('/service-images', [ServiceImageController::class, 'store']);
+    Route::post('/work-times', [CompanyManagerController::class, 'insertOrUpdate']);
 
 });

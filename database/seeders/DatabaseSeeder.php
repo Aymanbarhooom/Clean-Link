@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RegionSeeder::class,
             CategorySeeder::class,
             CompanySeeder::class,
+            WorkTimeSeeder::class,
             AttributeSeeder::class,
             SkillSeeder::class,
             ServiceSeeder::class,

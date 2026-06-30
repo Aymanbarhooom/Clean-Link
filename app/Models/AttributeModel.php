@@ -19,4 +19,13 @@ class AttributeModel extends Model
         return $this->belongsToMany(Service::class, 'attribute_service', 'attribute_id', 'service_id')
             ->withPivot('price', 'duration');
     }
+
+
+    public function orders(): BelongsToMany
+    {
+        return $this->belongsToMany(Order::class, 'attribute_order', 'attribute_id', 'order_id')
+            ->withPivot('qty', 'price_at_order')
+            ->withTimestamps();
+    }
+
 }

@@ -25,9 +25,6 @@ class CompanyResource extends JsonResource
         'image' => $this->image,
         'location' => $this->{"location_$lang"},
         'rating' => (float) $this->rating,
-        'is_open' => (bool) $this->is_open,
-        'start_hour' => $this->start_hour,
-        'close_hour' => $this->close_hour,
 
         // جلب العلاقات شرطياً (يمكنك إنشاء UserResource للمدير والـ Worker إن وُجدوا)
         'manager' => $this->whenLoaded('manager'), 

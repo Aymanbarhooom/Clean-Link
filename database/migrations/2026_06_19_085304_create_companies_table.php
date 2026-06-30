@@ -20,9 +20,6 @@ return new class extends Migration
             $table->string('location_ar')->nullable();
             $table->string('location_en')->nullable();
             $table->decimal('rating', 3, 2)->default(0.00);
-            $table->boolean('is_open')->default(true);
-            $table->time('start_hour')->nullable();
-            $table->time('close_hour')->nullable();
             $table->timestamps();
         });
     }

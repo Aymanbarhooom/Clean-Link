@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('service_images', function (Blueprint $table) {
+       Schema::create('work_times', function (Blueprint $table) {
     $table->id();
-    $table->foreignId('service_id')->constrained()->onDelete('cascade');
-    $table->string('image_before')->nullable();
-    $table->string('image_after')->nullable();
+    $table->foreignId('company_id')->constrained()->onDelete('cascade');
+    $table->tinyInteger('day_of_week'); // 0 = Sunday, ..., 6 = Saturday
+    $table->time('open_at')->nullable();
+    $table->time('close_at')->nullable();
+    $table->boolean('is_holiday')->default(false);
     $table->timestamps();
 });
 
@@ -26,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('service_images');
+        Schema::dropIfExists('work_times');
     }
 };

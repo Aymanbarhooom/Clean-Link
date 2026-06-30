@@ -94,5 +94,11 @@ class HomeController extends Controller
         ], "Search index results generated for term: '{$searchQuery}'");
     }
 
-
+    public function getoffers(): JsonResponse
+    {
+        $offers = Service::where('discount', '>', 0)
+        ->orderBy('discount', 'desc')
+        ->get();
+        return $this->successResponse($offers, "Offers retrieved successfully");
+    }
 }
