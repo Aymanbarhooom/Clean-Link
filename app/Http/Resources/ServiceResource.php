@@ -28,6 +28,7 @@ class ServiceResource extends JsonResource
         'price' => (float) $this->price,
         'image' => $this->image,
         'discount' => (float) $this->discount,
+        'is_favorite' => $this->is_favorite,
 
         // العلاقات
         'company' => new CompanyResource($this->whenLoaded('company')),

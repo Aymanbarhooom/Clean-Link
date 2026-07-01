@@ -53,52 +53,105 @@ class HomeController extends Controller
         ], 'Home page aggregates loaded successfully'); 
     } 
 
-    public function search(Request $request): JsonResponse
-    {
-        $request->validate([
-            'query' => 'required|string|max:255',
-        ]);
+   public function search(Request $request): JsonResponse
+{
+    $request->validate([
+        'query' => 'required|string|max:255',
+        'region_id' => 'nullable|numeric', // Enforce numeric region ID validation
+    ]);
 
-        $searchQuery = $request->input('query');
-        $locale = app()->getLocale(); // Detected automatically from 'Accept-Language' header via Middleware
+    $searchQuery = $request->input('query');
+    $regionId = $request->input('region_id');
 
-        // 1. Search in Regions
-        $regions = Region::where("name_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->get();
-
-        // 2. Search in Categories
-        $categories = Category::where("name_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->orWhere("description_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->get();
-
-        // 3. Search in Companies
-        $companies = Company::where("name_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->orWhere("description_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->get();
-
-        // 4. Search in Services (General)
-        $services = Service::where("name_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->orWhere("description_{$locale}", 'LIKE', "%{$searchQuery}%")
-            ->get();
-
-        // 5. Filter Offers out of the matched services to create an isolated pool
-        $offers = $services->where('discount', '>', 0)->take(5)->values();
-
-        // Structural Payload Response using your explicit API Resources Mapping
-        return $this->successResponse([
-            'regions' => RegionResource::collection($regions),
-            'categories' => CategoryResource::collection($categories),
-            'companies' => CompanyResource::collection($companies),
-            'services' => ServiceResource::collection($services),
-            'offers' => ServiceResource::collection($offers),
-        ], "Search index results generated for term: '{$searchQuery}'");
+    // 1. Search in Regions
+    $regionsQuery = Region::where(function ($query) use ($searchQuery) {
+        $query->where("name_en", 'LIKE', "%{$searchQuery}%")
+            ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
+    });
+    
+    if ($regionId) {
+        $regionsQuery->where('id', (int) $regionId);
     }
+    $regions = $regionsQuery->with('manager')->get();
+
+    // 2. Search in Categories
+    $categories = Category::where("name_en", 'LIKE', "%{$searchQuery}%")
+        ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%")
+        ->get();
+
+    // 3. Search in Companies (Filtered by Region & Rating)
+    $companiesQuery = Company::where(function ($query) use ($searchQuery) {
+        $query->where("name_en", 'LIKE', "%{$searchQuery}%")
+            ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
+    });
+
+    if ($regionId) {
+        $companiesQuery->where('region_id', (int) $regionId);
+    }
+
+    if ($request->filled('rating')) {
+        $rating = (float) $request->input('rating');
+        if (fmod($rating, 1) === 0.0) {
+            $companiesQuery->where('rating', $rating);
+        } else {
+            $companiesQuery->where('rating', '>=', floor($rating))
+                ->where('rating', '<', ceil($rating));
+        }
+    }
+    $companies = $companiesQuery->get();
+
+    // 4. Search in Services (Filtered by Region & Rating)
+    $servicesQuery = Service::query()
+        ->where(function ($query) use ($searchQuery) {
+            $query->where("name_en", 'LIKE', "%{$searchQuery}%")
+                ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
+        });
+
+    if ($regionId) {
+        $servicesQuery->whereHas('company', function ($query) use ($regionId) {
+            $query->where('region_id', (int) $regionId);
+        });
+    }
+
+    if ($request->filled('price_range')) {
+        $priceRange = trim((string) $request->input('price_range'));
+        if (preg_match('/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*\$?\s*$/i', $priceRange, $matches)) {
+            $servicesQuery->whereBetween('price', [(float) $matches[1], (float) $matches[2]]);
+        }
+    }
+
+    if ($request->filled('rating')) {
+        $rating = (float) $request->input('rating');
+        if (fmod($rating, 1) === 0.0) {
+            $servicesQuery->where('rating', $rating);
+        } else {
+            $servicesQuery->where('rating', '>=', floor($rating))
+                ->where('rating', '<', ceil($rating));
+        }
+    }
+
+    $services = $servicesQuery
+        ->orderBy('rating', 'desc')
+        ->get();
+
+    // 5. Filter Offers
+    $offers = $services->where('discount', '>', 0)->take(5)->values();
+
+    return $this->successResponse([
+        'regions' => RegionResource::collection($regions),
+        'categories' => CategoryResource::collection($categories),
+        'companies' => CompanyResource::collection($companies),
+        'services' => ServiceResource::collection($services),
+        'offers' => ServiceResource::collection($offers),
+    ], "Search index results generated for term: '{$searchQuery}'");
+}
+
 
     public function getoffers(): JsonResponse
     {
         $offers = Service::where('discount', '>', 0)
         ->orderBy('discount', 'desc')
         ->get();
-        return $this->successResponse($offers, "Offers retrieved successfully");
+        return $this->successResponse(ServiceResource::collection($offers), "Offers retrieved successfully");
     }
 }

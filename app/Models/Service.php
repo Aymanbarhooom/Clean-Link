@@ -25,6 +25,7 @@ class Service extends Model
         'image',
         'discount'
     ];
+    protected $appends = ['is_favorite'];
 
     // --- Relationships ---
 
@@ -85,4 +86,15 @@ class Service extends Model
             get: fn($value) => $value ? asset('storage/' . $value) : null,
         );
     }
+
+    public function getIsFavoriteAttribute(): bool
+{
+    if (!auth()->check()) {
+        return false;
+    }
+
+    return $this->favoritedBy()
+                ->where('user_id', auth()->id())
+                ->exists();
+}
 }

@@ -46,25 +46,27 @@ class AuthController extends Controller
     }
 
     public function login(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+{
+    // 1. التحقق من البيانات المدخلة
+    $validated = $request->validate([
+        'email' => 'required|email',
+        'password' => 'required',
+    ]);
 
-        $user = User::where('email', $validated['email'])->first();
+    $user = User::where('email', $validated['email'])->first();
 
-        if (!$user || !Hash::make($validated['password'], ['fallback' => $user->password])) {
-            return $this->errorResponse('Invalid operational login credentials', 401);
-        }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return $this->successResponse([
-            'user' => $user->load('profile'),
-            'access_token' => $token,
-        ], 'Logged in successfully');
+    if (!$user || !Hash::check($validated['password'], $user->password)) {
+        return $this->errorResponse('Invalid operational login credentials', 401);
     }
+
+    $token = $user->createToken('auth_token')->plainTextToken;
+
+    return $this->successResponse([
+        'user' => $user->load('profile'),
+        'access_token' => $token,
+    ], 'Logged in successfully');
+}
+
 
     public function logout(Request $request): JsonResponse
     {

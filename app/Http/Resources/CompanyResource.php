@@ -25,8 +25,8 @@ class CompanyResource extends JsonResource
         'image' => $this->image,
         'location' => $this->{"location_$lang"},
         'rating' => (float) $this->rating,
+        'is_favorite' => $this->is_favorite,
 
-        // جلب العلاقات شرطياً (يمكنك إنشاء UserResource للمدير والـ Worker إن وُجدوا)
         'manager' => $this->whenLoaded('manager'), 
         'region' => new RegionResource($this->whenLoaded('region')),
         'services' => ServiceResource::collection($this->whenLoaded('services')),
