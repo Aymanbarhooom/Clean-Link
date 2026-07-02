@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -135,6 +136,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // 👥 Operational Crews & Workgroups Management
     // ==========================================
     Route::apiResource('workgroups', WorkgroupController::class);
+
+
+    Route::get('packages/{package}/available-slots', [OrderController::class, 'getAvailableSlots']);
+    Route::post('orders', [OrderController::class, 'store']);
+    Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
+
 
 
 });
