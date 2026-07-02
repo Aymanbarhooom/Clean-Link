@@ -93,16 +93,17 @@ class WorkerSeeder extends Seeder
                 ]);
 
                 // Step D: Attach 3 random skills to the worker
-                $allSkills = Skill::pluck('id')->toArray();
+                $allSkills = Skill::take(16)->get();
+                $allSkills = $allSkills->pluck('id')->toArray();
                 if (!empty($allSkills)) {
-                    $randomSkills = array_slice($allSkills, 0, min(3, count($allSkills)));
-                    if (count($randomSkills) < 3) {
-                        // If fewer than 3 skills exist, shuffle and use what's available
+                    $randomSkills = array_slice($allSkills, 0, min(4, count($allSkills)));
+                    if (count($randomSkills) < 4) {
+                        // If fewer than 4 skills exist, shuffle and use what's available
                         $randomSkills = $allSkills;
                     } else {
-                        // Get 3 random skills
+                        // Get 4 random skills
                         shuffle($allSkills);
-                        $randomSkills = array_slice($allSkills, 0, 3);
+                        $randomSkills = array_slice($allSkills, 0, 4);
                     }
                     $workerProfile->skills()->attach($randomSkills);
                 }

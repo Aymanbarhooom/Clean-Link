@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Package;
@@ -26,15 +26,17 @@ class OrderController extends Controller
      * 7-Day Advanced Intersection Scheduling Engine.
      * Route: GET /api/packages/{package}/available-slots
      */
+    /**
+     * محرك حساب الأوقات الشاغرة المطور (دعم جدول الدوام، العطل، والحجز الفوري من اليوم)
+     * Route: GET /api/packages/{package}/available-slots
+     */
     public function getAvailableSlots(Package $package): JsonResponse
     {
         $service = $package->service;
         $company = $service->company;
-        
-        // 1. Identify minimum competency skill prerequisites for the service
-        $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
+        $packageDuration = $package->duration; // بالدقائق
 
-        // 2. Fetch company workgroups that collectively possess ALL required skills
+        $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
         $eligibleWorkgroups = Workgroup::where('company_id', $company->id)
             ->get()
             ->filter(function ($workgroup) use ($requiredSkillIds) {
@@ -43,52 +45,89 @@ class OrderController extends Controller
             });
 
         if ($eligibleWorkgroups->isEmpty()) {
-            return $this->successResponse([], 'No qualified workgroups are currently available for this service context');
+            return $this->successResponse([], 'No qualified workgroups are currently available for this service');
         }
 
-        // 3. Define company operational boundaries (fallback to 08:00 - 22:00 if not set)
-        $startHour = $company->start_hour ? Carbon::createFromTimeString($company->start_hour)->format('H:i') : '08:00';
-        $closeHour = $company->close_hour ? Carbon::createFromTimeString($company->close_hour)->format('H:i') : '22:00';
+        // 2. جلب جدول مواعيد العمل للشركة بالكامل وتخزينه كـ Collection للبحث السريع بكود اليوم
+        $workTimes = $company->workTimes()->get()->keyBy('day_of_week');
 
-        // 4. Construct a 7-day schedule window starting from tomorrow morning
-        $startDate = Carbon::tomorrow();
-        $endDate = Carbon::tomorrow()->addDays(6);
+        // 3. بناء مصفوفة الـ 7 أيام تبدأ من "اليوم" (Now) وتنتهي بعد 6 أيام
+        $startDate = Carbon::now();
+        $endDate = Carbon::now()->addDays(6);
         $period = CarbonPeriod::create($startDate, $endDate);
 
         $scheduleMatrix = [];
-        $packageDuration = $package->duration; // in minutes
 
         foreach ($period as $date) {
             $currentDayKey = $date->format('Y-m-d');
+            $dayOfWeek = $date->dayOfWeek; // يرجع 0 للأحد، 1 للاثنين... حتى 6 للسبت متوافق مع جدولك
+
+            // فحص هل هذا اليوم مسجل في جدول الدوام وهل هو عطلة؟
+            $daySetting = $workTimes->get($dayOfWeek);
+            if (!$daySetting || $daySetting->is_holiday || !$daySetting->open_at || !$daySetting->close_at) {
+                // إذا كان اليوم عطلة، نرجعه كمصفوفة فارغة لـ لفرونت إند ولا نحسب له أي Slots
+                $scheduleMatrix[$currentDayKey] = [];
+                continue;
+            }
+
+            // تحديد ساعات العمل الفتح والإغلاق لهذا اليوم بالتحديد من الـ Database
+            $openHourStr = Carbon::parse($daySetting->open_at)->format('H:i');
+            $closeHourStr = Carbon::parse($daySetting->close_at)->format('H:i');
+
+            // تحويل الساعات الممتدة لنصوص إلى Object زمني كامل مربوط بتاريخ اليوم الحالي في الحلقة
+            $companyOpenTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $openHourStr);
+            $companyCloseTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $closeHourStr);
+
+            // 4. تطبيق معادلة تقريب الموعد الحالي (إذا كنا نفحص اليوم الحاضر)
+            if ($date->isToday()) {
+                $now = Carbon::now();
+
+                // تقريب الدقائق إلى الخلف (Round Down) إلى 00 أو 30
+                $roundedNow = $now->copy();
+
+                // إضافة 30 دقيقة إذا كانت الدقائق أقل من 30
+                if ($now->minute < 30) {
+                    $roundedNow->minute(30)->second(0);
+                } else {
+                    // إذا كانت الدقائق 30 أو أكثر، نضيف ساعة ونضبط الدقائق إلى 0
+                    $roundedNow->addHour()->minute(0)->second(0);
+                }
+
+
+                // إضافة ساعة كاملة كـ (Buffer / هامش أمان) لمعالجة الـ Slots والتحضير
+                $earliestPossibleStart = $roundedNow->addHour();
+
+                // نقطة البدء لليوم تكون الأكبر بين: (وقت فتح الشركة) أو (الوقت الحالي المقرب + ساعة الأمان)
+                $loopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
+            } else {
+                // للأيام المستقبلية: البدء يكون دائماً من ساعة فتح الشركة الرسمية في ذلك اليوم
+                $loopTime = $companyOpenTime;
+            }
+
             $scheduleMatrix[$currentDayKey] = [];
 
-            // Slice operational hours into 30-minute arrival window start markers
-            $loopTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $startHour);
-            $endTimeLimit = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $closeHour);
-
-            while ($loopTime->copy()->addMinutes($packageDuration)->lte($endTimeLimit)) {
+            // 5. حلقة فحص الـ Slots المتاحة كل 30 دقيقة
+            while ($loopTime->copy()->addMinutes($packageDuration)->lte($companyCloseTime)) {
                 $slotStart = $loopTime->copy();
                 $slotEnd = $loopTime->copy()->addMinutes($packageDuration);
-                
+
                 $isSlotAvailable = false;
 
-                // 5. Overlap Scan: Find at least one qualified workgroup that is free during this entire window
+                // فحص التقاطع الجدولي (Overlap) مع الورش المؤهلة
                 foreach ($eligibleWorkgroups as $workgroup) {
                     $hasOverlapConflict = Order::where('status', '!=', 'canceled')
                         ->whereHas('tasks', function ($query) use ($workgroup) {
                             $query->where('workgroup_id', $workgroup->id);
                         })
                         ->where(function ($query) use ($slotStart, $slotEnd) {
-                            // Check standard booking overlap criteria
                             $query->where('start_time', '<', $slotEnd)
-                                  ->where('end_time', '>', $slotStart);
+                                ->where('end_time', '>', $slotStart);
                         })
                         ->exists();
 
-                    // If a crew has no scheduling conflicts, this starting time is available!
                     if (!$hasOverlapConflict) {
                         $isSlotAvailable = true;
-                        break; // Stop checking other crews for this specific slot
+                        break;
                     }
                 }
 
@@ -96,12 +135,13 @@ class OrderController extends Controller
                     $scheduleMatrix[$currentDayKey][] = $slotStart->format('H:i');
                 }
 
-                $loopTime->addMinutes(30); // Advance to the next time interval marker
+                $loopTime->addMinutes(30); // الانتقال لنصف الساعة التالية
             }
         }
 
-        return $this->successResponse($scheduleMatrix, 'Available scheduling windows for the next 7 days calculated successfully');
+        return $this->successResponse($scheduleMatrix, 'Dynamic slots mapped across active work-time sheets successfully');
     }
+
 
     /**
      * Store and secure a client order with real-time financial tracking.
@@ -118,7 +158,7 @@ class OrderController extends Controller
             'location' => 'required|string|max:500',
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
-            
+
             // Nested pricing addons validation parameters
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
@@ -130,12 +170,12 @@ class OrderController extends Controller
 
         // Calculate time parameters based on the core package selection
         $startTime = Carbon::parse($validated['start_time']);
-        $totalDuration = $package->duration; 
+        $totalDuration = $package->duration;
         $endTime = $startTime->copy()->addMinutes($totalDuration);
 
         // Process order mapping inside a safe database transaction block
         $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration) {
-            
+
             // 1. Create the base client order profile
             $order = Order::create([
                 'client_id' => auth()->id(),
@@ -154,14 +194,14 @@ class OrderController extends Controller
             // 2. Lock in custom attribute pricing variants
             if (!empty($validated['attributes'])) {
                 $pivotPayload = [];
-                
+
                 foreach ($validated['attributes'] as $item) {
                     // Extract historic values from the service definition pivot
                     $serviceAttributePivot = $service->attributes()->where('attributes.id', $item['id'])->first();
-                    
+
                     // Fallback to 0.00 if the company hasn't configured custom pricing for this attribute
                     $priceAtOrder = $serviceAttributePivot ? $serviceAttributePivot->pivot->price : 0.00;
-                    
+
                     $pivotPayload[$item['id']] = [
                         'qty' => $item['qty'],
                         'price_at_order' => $priceAtOrder,
@@ -181,8 +221,8 @@ class OrderController extends Controller
         });
 
         return $this->successResponse(
-            $order->load(['package.service', 'attributes']), 
-            'Booking submitted and placed under review successfully', 
+            $order->load(['package.service', 'attributes']),
+            'Booking submitted and placed under review successfully',
             211
         );
     }
@@ -197,7 +237,7 @@ class OrderController extends Controller
         $this->authorize('cancel', $order);
 
         $order->update(['status' => 'canceled']);
-        
+
         // Cascade delete or cancel any assigned tasks linked to this order
         $order->tasks()->delete();
 

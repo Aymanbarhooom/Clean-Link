@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
             $table->foreignId('order_id')->constrained('orders')->onDelete('cascade');
-            $table->foreignId('worker_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('workgroup_id')->constrained('workgroups')->onDelete('cascade');
             $table->enum('status', ['on_way', 'handling', 'done'])->default('on_way');
             $table->string('image_before')->nullable();
             $table->string('image_after')->nullable();

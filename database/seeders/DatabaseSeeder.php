@@ -26,7 +26,8 @@ class DatabaseSeeder extends Seeder
             PackageSeeder::class,
             ServiceImageSeeder::class,
             ReviewSeeder::class,
-            WorkerSeeder::class
+            WorkerSeeder::class,
+            WorkGroupeSeeder::class
         ]);
     }
 }

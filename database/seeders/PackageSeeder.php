@@ -28,7 +28,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الاستوديو',
                     'name_en' => 'Studio Package',
-                    'duration' => max(45, intval($service->min_duration * 0.6)),
+                    'duration' => 30,
                     'price' => 80,
                     'price_after_discount' => $service->discount > 0 ? 80 - (80 * ($service->discount/100)) : 80,
                     'details_ar' => [
@@ -46,7 +46,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الشقة القياسية',
                     'name_en' => 'Flat Package',
-                    'duration' => intval(($service->min_duration + $service->max_duration) / 2),
+                    'duration' => 60,
                     'price' => 60,
                     'price_after_discount' => $service->discount > 0 ? 60 - (60 * ($service->discount/100)) : 60,
                     'details_ar' => [
@@ -66,7 +66,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الدوبلكس والمباني الكاملة',
                     'name_en' => 'Duplex & Building Package',
-                    'duration' => intval($service->max_duration * 1.5),
+                    'duration' => 90,
                     'price' => 108,
                     'price_after_discount' => $service->discount > 0 ? 108 - (108 * ($service->discount/100)) : 108,
                     'details_ar' => [
@@ -90,7 +90,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'فئة السيدان والهاتشباك',
                     'name_en' => 'Sedan / Hatchback Tier',
-                    'duration' => max(20, intval($service->min_duration * 0.8)),
+                    'duration' => 60,
                     'price' => 24,
                     'price_after_discount' => $service->discount > 0 ? (24 - (24 * ($service->discount/100))) : 24,
                     'details_ar' => [
@@ -110,7 +110,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'فئة السيارات العائلية والكروس أوفر (SUV)',
                     'name_en' => 'SUV & Crossover Tier',
-                    'duration' => intval(($service->min_duration + $service->max_duration) / 2),
+                    'duration' => 120,
                     'price' => 60,
                     'price_after_discount' => $service->discount > 0 ? 60 - (60 * ($service->discount/100)) : 60,
                     'details_ar' => [
@@ -130,7 +130,7 @@ class PackageSeeder extends Seeder
                     'service_id' => $service->id,
                     'name_ar' => 'الفئة النخبوية للشاحنات والسيارات الفان الكبيرة',
                     'name_en' => 'Large Van & Truck Elite Tier',
-                    'duration' => intval($service->max_duration * 1.3),
+                    'duration' => 90,
                     'price' => 240,
                     'price_after_discount' => $service->discount > 0 ? 240 - (240 * ($service->discount/100)) : 240,
                     'details_ar' => [
