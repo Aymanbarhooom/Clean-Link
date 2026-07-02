@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\OrderResource;
 use App\Models\Package;
 use App\Models\Order;
 use App\Models\Workgroup;
@@ -243,4 +244,154 @@ class OrderController extends Controller
 
         return $this->successResponse($order, 'Order cancelled and linked field schedules cleared');
     }
+
+    /**
+     * استعراض الطلبات بناءً على الصلاحيات والأدوار المحددة في الـ Policy
+     * Route: GET /api/orders
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Order::class);
+
+        $user = auth()->user();
+
+        // بناء الاستعلام مع الـ Eager Loading لمنع الـ N+1 Query Problem
+        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup']);
+
+        // تطبيق الفلترة الصارمة بناءً على دور المستخدم
+        if ($user->isAdmin()) {
+            // الأدمن يرى كل شيء في النظام
+        } elseif ($user->isCompanyManager()) {
+            // مدير الشركة يرى طلبات باقات خدمات شركته فقط
+            $company = $user->managedCompanies()->first();
+            if (!$company)
+                return $this->successResponse([], 'No company registered');
+
+            $query->whereHas('package.service', function ($q) use ($company) {
+                $q->where('company_id', $company->id);
+            });
+        } elseif ($user->role === 'region_manager') {
+            // مدير المنطقة يرى طلبات الشركات الواقعة في منطقته الإدارية
+            $query->whereHas('package.service.company', function ($q) use ($user) {
+                $q->where('region_id', $user->managedRegions()->pluck('id'));
+            });
+        } else {
+            // العميل يرى طلباته الشخصية فقط
+            $query->where('client_id', $user->id);
+            $query->orderBy('created_at', 'desc');
+            return $this->successResponse(OrderResource::collection($query->get()), 'Orders index fetched successfully');
+        }
+        
+        return $this->successResponse($query->orderBy('created_at', 'desc')->get(), 'Orders index fetched successfully');
+    }
+
+    /**
+     * عرض تفاصيل طلب محدد بعد فحص الصلاحية
+     * Route: GET /api/orders/{order}
+     */
+    public function show(Order $order): JsonResponse
+    {
+        // فحص الصلاحية عبر الـ Policy (العميل يرى طلبه، المدير يرى طلبات شركته...)
+        $this->authorize('view', $order);
+
+        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
+
+        return $this->successResponse(OrderResource::collection($order), 'Order detailed parameters retrieved');
+    }
+
+        /**
+     * إسناد الطلب لورشة عمل معينة وإنشاء المهمة (خاص بمدير الشركة)
+     * Route: POST /api/orders/{order}/assign
+     */
+    public function assignToWorkgroup(Request $request, Order $order): JsonResponse
+    {
+        // التحقق من أن المستخدم الحالي هو مدير الشركة التي تملك هذه الخدمة
+        if (auth()->user()->id !== $order->package->service->company->manager_id) {
+            return $this->errorResponse('Unauthorized company domain access block', 403);
+        }
+
+        $validated = $request->validate([
+            'workgroup_id' => 'required|exists:workgroups,id',
+        ]);
+
+        $workgroup = Workgroup::find($validated['workgroup_id']);
+
+        // التأكد من أن الورشة المحددة تابعة لنفس الشركة
+        if ($workgroup->company_id !== $order->package->service->company_id) {
+            return $this->errorResponse('The selected workgroup does not belong to your company', 422);
+        }
+
+        // تنفيذ عملية الإسناد المزدوجة داخل Transaction لضمان سلامة البيانات
+        DB::transaction(function () use ($order, $workgroup) {
+            // 1. إنشاء المهمة المرتبطة بالورشة
+            $order->tasks()->create([
+                'workgroup_id' => $workgroup->id,
+                'status' => 'on_way' // تبدأ الحالة تلقائياً بـ "في الطريق" عند الإسناد
+            ]);
+
+            // 2. تحديث حالة الطلب الأساسي للعميل ليعرف أن هناك فريقاً تم تعيينه
+            $order->update(['status' => 'assigned_to_worker']);
+        });
+
+        return $this->successResponse($order->load('tasks.workgroup'), 'Order successfully assigned to the workgroup crew', 211);
+    }
+
+        /**
+     * Fetch qualified and available workgroups capable of handling a specific order.
+     * Assists the Company Manager by filtering crews by required skills and scheduling availability.
+     * Route: GET /api/orders/{order}/qualified-groups
+     */
+    public function getQualifiedGroups(Order $order): JsonResponse
+    {
+        $user = auth()->user();
+        $service = $order->package->service;
+        $company = $service->company;
+
+        // Security Boundary: Ensure only the managing Company Manager can query this data
+        if ($user->id !== $company->manager_id && !$user->isAdmin()) {
+            return $this->errorResponse('Unauthorized company domain access block', 403);
+        }
+
+        // 1. Identify the baseline prerequisite skill IDs required by this service
+        $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
+
+        $orderStart = $order->start_time;
+        $orderEnd = $order->end_time;
+
+        // 2. Fetch all company crews, then apply real-time double filters
+        $qualifiedGroups = Workgroup::where('company_id', $company->id)
+            ->with(['leader.profile', 'workers.profile', 'workers.workerProfile.skills'])
+            ->get()
+            ->filter(function ($workgroup) use ($requiredSkillIds, $orderStart, $orderEnd) {
+                
+                // --- CRITERIA 1: Competency Skill Matching ---
+                $groupSkills = $workgroup->getCombinedSkillIds();
+                $hasSkillsMatch = empty(array_diff($requiredSkillIds, $groupSkills));
+                
+                if (!$hasSkillsMatch) {
+                    return false; // Discard if the team lacks the required training credentials
+                }
+
+                // --- CRITERIA 2: Calendar Availability / Scheduling Overlaps ---
+                $hasTimeConflict = Order::where('status', '!=', 'canceled')
+                    ->whereHas('tasks', function ($query) use ($workgroup) {
+                        $query->where('workgroup_id', $workgroup->id);
+                    })
+                    ->where(function ($query) use ($orderStart, $orderEnd) {
+                        // Standard scheduling block collision intersection check
+                        $query->where('start_time', '<', $orderEnd)
+                              ->where('end_time', '>', $orderStart);
+                    })
+                    ->exists();
+
+                return !$hasTimeConflict; // Keep the group only if they have no scheduling conflicts
+            })
+            ->values(); // Reset the collection index keys for clean JSON array sequence formatting
+
+        return $this->successResponse(
+            $qualifiedGroups, 
+            'Qualified and available workgroups filtered successfully for dispatch'
+        );
+    }
+
 }

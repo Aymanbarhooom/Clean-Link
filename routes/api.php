@@ -15,6 +15,7 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\ServiceImageController;
 use App\Http\Controllers\SkillController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\WorkerProfileController;
 use App\Http\Controllers\WorkgroupController;
 use Illuminate\Support\Facades\Route;
@@ -141,7 +142,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('packages/{package}/available-slots', [OrderController::class, 'getAvailableSlots']);
     Route::post('orders', [OrderController::class, 'store']);
     Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
+    // ==========================================
+    // 🛒 مسارات الطلبات المتطورة (Orders Matrix)
+    // ==========================================
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::post('orders/{order}/assign', [OrderController::class, 'assignToWorkgroup']); // الإسناد لورشة
 
-
+    // ==========================================
+    // 👷 مسارات مهام العمال والورشات (Tasks Workflows)
+    // ==========================================
+    Route::get('tasks', [TaskController::class, 'index']); // جلب المهام (متاح لكل العمال في الورشة)
+    Route::put('tasks/{task}/update-status', [TaskController::class, 'updateStatus']); // تحديث ورفع الصور (للقائد فقط)
+    // ==========================================
+    // 🧠 Smart Dashboard Dispatch Indicators
+    // ==========================================
+    Route::get('orders/{order}/qualified-groups', [OrderController::class, 'getQualifiedGroups']);
 
 });

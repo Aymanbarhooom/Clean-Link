@@ -8,9 +8,26 @@ use App\Models\Order;
 
 class OrderPolicy
 {
+
+
     public function viewAny(User $user): bool
     {
-        return !$user->isWorker(); // Workers only look at explicitly assigned tasks instead
+        // يمكن للمستخدمين من نوع Admin عرض جميع الطلبات
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // يمكن للعميل عرض طلباته الخاصة
+        if ($user->role === 'client') {
+            return true; // العميل يمكنه رؤية طلباته الخاصة
+        }
+
+        // يمكن لمدير الشركة عرض الطلبات الخاصة بشركته
+        if ($user->isCompanyManager()) {
+            return true; // مدير الشركة يمكنه رؤية طلبات شركته
+        }
+
+        return false; // إذا لم يكن أي من الشروط السابقة متحققًا، يتم رفض الوصول
     }
 
     public function view(User $user, Order $order): bool
@@ -26,6 +43,7 @@ class OrderPolicy
     {
         return $user->role === 'client';
     }
+
 
     /**
      * Client cancellation rule constraint.

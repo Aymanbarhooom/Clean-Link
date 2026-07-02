@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workgroup;
+use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -45,28 +46,43 @@ class WorkgroupController extends Controller
             return $this->errorResponse('Only company managers can assemble teams', 403);
         }
 
-        $company = $user->managedCompanies()->first();
-        if (!$company) return $this->errorResponse('No active company profile validated', 422);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'company_id' => 'required|exists:companies,id',
             'leader_id' => 'required|exists:users,id',
             'worker_ids' => 'required|array|min:1',
             'worker_ids.*' => 'required|exists:users,id',
         ]);
 
-        $workgroup = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $company) {
+        // Ensure none of the provided workers (including leader) are already
+        // assigned to another workgroup. Use the User->workgroups relation.
+        $allStaff = array_unique(array_merge([$validated['leader_id']], $validated['worker_ids']));
+
+        $alreadyAssigned = User::whereIn('id', $allStaff)
+            ->whereHas('workgroups')
+            ->get(['id', 'fullname'])
+            ->toArray();
+
+        if (!empty($alreadyAssigned)) {
+            return $this->errorResponse(
+                'One or more selected users are already assigned to a workgroup',
+                422,
+                $alreadyAssigned
+            );
+        }
+
+        $workgroup = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $allStaff) {
             
             // Build parent record
             $workgroup = Workgroup::create([
-                'company_id' => $company->id,
+                'company_id' => $validated['company_id'],
                 'name' => $validated['name'],
                 'leader_id' => $validated['leader_id'],
             ]);
 
             // Sync structural staff identities to the many-to-many pivot loop
             // Automatically includes the leader inside the crew membership listing
-            $allStaff = array_unique(array_merge([$validated['leader_id']], $validated['worker_ids']));
             $workgroup->workers()->sync($allStaff);
 
             return $workgroup;
