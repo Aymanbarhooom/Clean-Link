@@ -23,6 +23,10 @@ class CategoryController extends Controller
         $perPage = $request->integer('per_page', 10);
         $perPage = max(1, min($perPage, 100));
         $categories = Category::paginate($perPage);
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($categories, 'Categories matrix retrieved successfully');   
+        }
         return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
     }
 
@@ -34,6 +38,10 @@ class CategoryController extends Controller
         $services = $category->services()->paginate($perPage);
 
         $category->setRelation('services', $services);
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($category, 'Category specific parameters loaded');   
+        }
 
         return $this->successResponse(new CategoryResource($category), 'Category specific parameters loaded');
     }

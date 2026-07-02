@@ -15,6 +15,7 @@ use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\ServiceImageController;
 use App\Http\Controllers\SkillController;
 use App\Http\Controllers\WorkerProfileController;
+use App\Http\Controllers\WorkgroupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -45,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Region Management Core
         Route::post('/', [RegionController::class, 'addRegion']);
         Route::get('/', [RegionController::class, 'getRegions']);
+        Route::get('/names', [RegionController::class, 'getRegionsNames']);
         Route::get('/{region}', [RegionController::class, 'showRegion']);
         Route::put('/{region}', [RegionController::class, 'updateRegion']);
         Route::delete('/{region}', [RegionController::class, 'deleteRegion']);
@@ -114,13 +116,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('skills', [SkillController::class, 'store']);
 
     // ==========================================
-// 🎓 Dynamic Skill Assignment Mapping Routes
-// ==========================================
+    // 🎓 Dynamic Skill Assignment Mapping Routes
+    // ==========================================
     Route::post('services/{service}/skills', [ServiceController::class, 'attachSkills']);
     Route::post('workers/skills', [CompanyManagerController::class, 'attachSkills']);
     // ==========================================
-// ❤️ ميزة المفضلة الموحدة (Favorites Engine)
-// ==========================================
+    // ❤️ (Favorites Engine)
+    // ==========================================
     Route::prefix('favorites')->group(function () {
         Route::get('/', [FavoriteController::class, 'index']);
         Route::post('/toggle', [FavoriteController::class, 'toggleFavorite']);
@@ -128,5 +130,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/service-images', [ServiceImageController::class, 'store']);
     Route::post('/work-times', [CompanyManagerController::class, 'insertOrUpdate']);
+
+    // ==========================================
+    // 👥 Operational Crews & Workgroups Management
+    // ==========================================
+    Route::apiResource('workgroups', WorkgroupController::class);
+
 
 });

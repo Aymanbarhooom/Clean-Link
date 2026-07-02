@@ -25,6 +25,7 @@ class FavoriteController extends Controller
     public function index(): JsonResponse
     {
         $userId = auth()->id();
+        $user = auth()->user();
 
         $services = Service::whereHas('favoritedBy', function ($q) use ($userId) {
             $q->where('user_id', $userId);
@@ -33,7 +34,12 @@ class FavoriteController extends Controller
         $companies = Company::whereHas('favoritedBy', function ($q) use ($userId) {
             $q->where('user_id', $userId);
         })->with(['region'])->get();
-
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse([
+                'services' => $services,
+                'companies' => $companies
+            ], 'User favorites catalog retrieved successfully');
+        }
         return $this->successResponse([
             'services' => ServiceResource::collection($services),
             'companies' => CompanyResource::collection($companies)

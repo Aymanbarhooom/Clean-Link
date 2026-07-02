@@ -34,6 +34,10 @@ class ServiceController extends Controller
         }
 
         $services = $query->orderBy('rating', 'desc')->get();
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($services, 'Services list successfully synchronized');   
+        }
         return $this->successResponse(ServiceResource::collection($services), 'Services list successfully synchronized');
     }
 
@@ -51,7 +55,10 @@ class ServiceController extends Controller
             'images',
             'requiredSkills'
         ]);
-
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($service, 'Comprehensive service parameters aggregated');
+        }
         return $this->successResponse(new ServiceResource($service), 'Comprehensive service parameters aggregated');
     }
 

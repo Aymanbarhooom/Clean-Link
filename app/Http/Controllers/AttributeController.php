@@ -26,9 +26,13 @@ class AttributeController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $user = auth()->user();
         $perPage = $request->integer('per_page', 10);
         $perPage = max(1, min($perPage, 100));
         $attributes = AttributeModel::orderBy('created_at', 'desc')->paginate($perPage);
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse($attributes, 'Global attribute dictionary retrieved successfully');
+        }
         return $this->successResponse(AttributeResource::collection($attributes), 'Global attribute dictionary retrieved successfully');
     }
 

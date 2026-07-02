@@ -10,8 +10,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Order extends Model
 {
     protected $fillable = [
-        'client_id', 'package_id',
-        'note', 'location', 'time', 'status', 'total_price'
+        'client_id',
+        'package_id',
+        'note',
+        'location',
+        'start_time',
+        'end_time',
+        'duration',
+        'status',
+        'total_price'
+    ];
+
+    protected $casts = [
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
     ];
 
     // --- Relationships ---
@@ -32,22 +44,16 @@ class Order extends Model
     }
 
     public function attributes(): BelongsToMany
-{
-    return $this->belongsToMany(AttributeModel::class, 'attribute_order', 'order_id', 'attribute_id')
-                ->withPivot('qty', 'price_at_order')
-                ->withTimestamps();
-}
+    {
+        return $this->belongsToMany(AttributeModel::class, 'attribute_order', 'order_id', 'attribute_id')
+            ->withPivot('qty', 'price_at_order')
+            ->withTimestamps();
+    }
 
-
-    // --- Helper Functions ---
-
-    /**
-     * Compute invoice total based on the selected package price and dynamic attributes.
-     */
     public function calculateAndSetTotalPrice(): void
     {
         $basePrice = $this->package->price;
-        
+
         $addonsPrice = $this->attributes()->get()->sum(function ($attribute) {
             return $attribute->pivot->qty * $attribute->pivot->price_at_order;
         });

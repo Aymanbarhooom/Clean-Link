@@ -32,7 +32,10 @@ class PackageController extends Controller
         $packages = Package::where('service_id', $request->service_id)
             ->orderBy('price', 'asc')
             ->get();
-
+            $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse($packages, 'Service variant packages retrieved successfully');
+        }
         return $this->successResponse(PackageResource::collection($packages), 'Service variant packages retrieved successfully');
     }
 
@@ -43,6 +46,10 @@ class PackageController extends Controller
     public function show(Package $package): JsonResponse
     {
         $package->load('service.company', 'service');
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($package, 'Package meta specifications loaded');   
+        }
         return $this->successResponse(new PackageResource($package), 'Package meta specifications loaded');
     }
 
