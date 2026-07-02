@@ -53,6 +53,13 @@ class User extends Authenticatable
         return $this->hasMany(Favorite::class);
     }
 
+    public function workgroups(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Workgroup::class, 'user_workgroup', 'user_id', 'workgroup_id')
+            ->withTimestamps();
+    }
+
+
 
     // --- Helper Functions ---
 
@@ -69,6 +76,11 @@ class User extends Authenticatable
     public function isCompanyManager(): bool
     {
         return $this->role === 'company_manager';
+    }
+
+    public function isRegionManager(): bool
+    {
+        return $this->role === 'region_manager';
     }
     public function fcmTokens(): HasMany
     {

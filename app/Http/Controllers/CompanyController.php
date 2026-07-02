@@ -158,10 +158,10 @@ class CompanyController extends Controller
         $query->where('manager_id', $user->id); 
     } 
 
-    // جلب البيانات أولاً من قاعدة البيانات
     $companies = $query->get();
-
-    // تمرير البيانات عبر الـ Resource لضمان تطبيق شروط اللغة والـ whenLoaded
+    if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse($companies, 'Companies list retrieved');
+        }
     return $this->successResponse(
         CompanyResource::collection($companies), 
         'Companies list retrieved'
@@ -172,6 +172,10 @@ class CompanyController extends Controller
     {
         $this->authorize('view', $company);
         $company->load(['region', 'services','workers.user.profile', 'reviews.client.profile']); 
+        $user = auth()->user();
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+         return $this->successResponse($company, 'Company profile retrieved');   
+        }
         return $this->successResponse(new CompanyResource($company), 'Company profile retrieved');
     }
 

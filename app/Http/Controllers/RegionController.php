@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RegionNameResource;
 use App\Http\Resources\RegionResource;
 use App\Models\Region;
 use App\Models\User;
@@ -111,7 +112,9 @@ class RegionController extends Controller
         } else {
             return $this->errorResponse('Access mapping blocked', 403);
         }
-
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse($regions, 'Regions context retrieved');
+        }
         return $this->successResponse(RegionResource::collection($regions), 'Regions context retrieved');
     }
 
@@ -121,6 +124,9 @@ class RegionController extends Controller
         
         if ($user->isAdmin() || $user->role === 'client' || ($user->role === 'region_manager' && $region->manager_id === $user->id)) {
             $region->load('manager', 'companies');
+        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+            return $this->successResponse($region, 'Region details retrieved');
+        }
             return $this->successResponse(new RegionResource($region), 'Region details retrieved');
         }
 
@@ -136,4 +142,10 @@ class RegionController extends Controller
         $region->delete();
         return $this->successResponse([], 'Region deleted successfully');
     }
+    public function getRegionsNames(): JsonResponse
+    {
+        $regions = Region::all();
+        return $this->successResponse(RegionNameResource::collection($regions), 'Regions names retrieved successfully');
+    }
+    
 }
