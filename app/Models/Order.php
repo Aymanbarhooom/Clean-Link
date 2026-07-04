@@ -24,6 +24,8 @@ class Order extends Model
     protected $casts = [
         'start_time' => 'datetime',
         'end_time' => 'datetime',
+        'duration' => 'integer',
+        'total_price' => 'decimal:2',
     ];
 
     // --- Relationships ---
