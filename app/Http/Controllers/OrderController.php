@@ -221,8 +221,10 @@ class OrderController extends Controller
             return $order;
         });
 
+        $order->load(['package.service', 'attributes']);
+
         return $this->successResponse(
-            $order->load(['package.service', 'attributes']),
+            new OrderResource($order),
             'Booking submitted and placed under review successfully',
             211
         );
@@ -296,7 +298,7 @@ class OrderController extends Controller
 
         $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
 
-        return $this->successResponse(OrderResource::collection($order), 'Order detailed parameters retrieved');
+        return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
 
         /**
