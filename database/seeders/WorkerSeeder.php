@@ -27,7 +27,7 @@ class WorkerSeeder extends Seeder
         }
 
         // 2. Define base names & generate permutations
-        $baseNames = ["Ahmed", "Fatima", "Youssef", "Maryam", "Omar", "Zainab", "Ali", "Khadija", "Khaled", "Aisha", "Mustafa"];
+        $baseNames = ["Ahmed", "Ali", "Youssef", "Bakr", "Omar", "Oday", "Osama", "Amr", "Khaled", "Sami", "Mustafa"];
         $fullNames = [];
 
         foreach ($baseNames as $first) {
@@ -66,7 +66,7 @@ class WorkerSeeder extends Seeder
                 
                 // Convert full name to a unique slug format for their email (e.g., ahmed.fatima@example.com)
                 $emailPrefix = Str::slug($currentFullName, '.');
-                $uniqueEmail = $emailPrefix . '.' . rand(10, 99) . '@example.com';
+                $uniqueEmail = $emailPrefix . '@example.com';
 
                 // Step A: Create User account (role = 'worker')
                 $user = User::create([
