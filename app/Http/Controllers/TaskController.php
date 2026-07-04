@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -36,10 +37,24 @@ class TaskController extends Controller
         return $this->successResponse($tasks, 'Your workgroup tasks logs fetched');
     }
 
-    /**
-     * تحديث حالة المهمة ورفع الصور (مسموح فقط لرئيس الورشة / Leader)
-     * Route: PUT /api/tasks/{task}/update-status
-     */
+    public function show(Task $task): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isWorker() && !$user->isAdmin()) {
+            return $this->errorResponse('Access restricted to field workers', 403);
+        }
+
+        if (!$user->isAdmin() && !$task->workgroup->workers()->where('users.id', $user->id)->exists()) {
+            return $this->errorResponse('Access restricted to task members only', 403);
+        }
+         $task->load(['order.package.service', 'workgroup.leader']);
+        return $this->successResponse(
+          new TaskResource($task),
+            'Task details retrieved successfully'
+        );
+    }
+
     public function updateStatus(Request $request, Task $task): JsonResponse
     {
         $user = auth()->user();
@@ -51,9 +66,13 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'status' => 'required|in:on_way,handling,done',
-            'image_before' => 'nullable|string', // مسار الصورة المرفوعة قبل التنظيف
-            'image_after' => 'nullable|string',  // مسار الصورة المرفوعة بعد التنظيف
         ]);
+        if ($request->hasFile('image_before')) {
+            $validated['image_before'] = $request->file('image_before')->store('task_images', 'public');
+        }
+        if ($request->hasFile('image_after')) {
+            $validated['image_after'] = $request->file('image_after')->store('task_images', 'public');
+        }
 
         // تحديث الحقول الممررة بذكاء
         $task->update(array_filter($validated));
