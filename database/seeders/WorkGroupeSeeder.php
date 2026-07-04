@@ -2,9 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\Company;
-use App\Models\User;
 use App\Models\Workgroup;
+use App\Models\WorkerProfile;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -16,37 +15,69 @@ class WorkGroupeSeeder extends Seeder
      */
     public function run(): void
     {
-        // Retrieve all company vendor profiles from database registry
-        $companies = Company::all();
+        $workers = WorkerProfile::with(['user', 'company'])
+            ->orderBy('company_id')
+            ->get();
 
-        foreach ($companies as $company) {
-            
-            $companyWorkers = $company->workers()->get();
+        if ($workers->isEmpty()) {
+            $this->command->info('No workers found in the system.');
+            return;
+        }
 
-            $workerChunks = $companyWorkers->chunk(2);
+        $this->command->info('All workers in system:');
+        foreach ($workers as $index => $worker) {
+            $name = optional($worker->user)->fullname ?: 'Unknown';
+            $companyName = optional($worker->company)->name_en ?: 'No Company';
+            $this->command->info(sprintf(
+                '  %d) %s (user_id=%d, company_id=%s, company=%s)',
+                $index + 1,
+                $name,
+                $worker->user_id,
+                $worker->company_id ?? 'null',
+                $companyName
+            ));
+        }
+
+        $workersByCompany = $workers->groupBy('company_id');
+
+        foreach ($workersByCompany as $companyId => $companyWorkers) {
+            $company = $companyWorkers->first()->company;
+            $companyName = optional($company)->name_en ?: 'Unknown Company';
+
+            $this->command->info("\nGrouping workers for company: {$companyName} (ID: {$companyId})");
+
+            $pairChunks = $companyWorkers->chunk(2);
             $groupIndex = 1;
 
-            foreach ($workerChunks as $pair) {
-                if ($pair->count() < 2) continue; // Boundary safety check
+            foreach ($pairChunks as $pair) {
+                if ($pair->count() < 2) {
+                    $worker = $pair->first();
+                    $name = optional($worker->user)->fullname ?: 'Unknown';
+                    $this->command->warn("Skipping lone worker {$name} (user_id={$worker->user_id}) because only one worker remains.");
+                    continue;
+                }
 
                 $workersArray = $pair->values();
-                $leader = $workersArray[0]; // Per instructions: Leader is the first worker
-                
+                $leader = $workersArray[0];
+
                 DB::transaction(function () use ($company, $groupIndex, $leader, $workersArray) {
-                    // 1. Establish structural parent crew container
                     $workgroup = Workgroup::create([
                         'company_id' => $company->id,
-                        'name' => 'Crew Team ' . $groupIndex . ' (' . $company->name_en . ')',
-                        'leader_id' => $leader->id,
+                        'name' => 'Crew Team ' . $groupIndex . ' (' . optional($company)->name_en . ')',
+                        'leader_id' => $leader->user_id,
                     ]);
 
-                    // 2. Map all workers within this specific pair chunk into the user_workgroup pivot table
-                    $staffIds = [$workersArray[0]->id, $workersArray[1]->id];
+                    $staffIds = $workersArray->pluck('user_id')->toArray();
                     $workgroup->workers()->sync($staffIds);
                 });
+
+                $memberNames = $workersArray->map(fn ($profile) => optional($profile->user)->fullname ?: 'Unknown')->implode(', ');
+                $this->command->info("  Created workgroup {$groupIndex} with leader {$leader->user->fullname} and members: {$memberNames}");
 
                 $groupIndex++;
             }
         }
+
+        $this->command->info('Workgroup seeding completed.');
     }
 }
