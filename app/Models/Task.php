@@ -25,7 +25,7 @@ class Task extends Model
     
     public function advanceStatus(string $newStatus): bool
     {
-        if (!in_array($newStatus, ['on_way', 'handling', 'done'])) {
+        if (!in_array($newStatus, ['pending', 'on_way', 'handling', 'done'])) {
             return false;
         }
 

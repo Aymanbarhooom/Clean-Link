@@ -37,7 +37,7 @@ class TaskSeeder extends Seeder
                 Task::create([
                     'order_id' => $order->id,
                     'workgroup_id' => $firstWorkgroup->id,
-                    'status' => 'on_way', // Crews default straight to 'On the Way' state on dispatch
+                    'status' => 'pending', // Crews default straight to 'Pending' state on dispatch
                     'image_before' => null, // Waiting for field action triggers
                     'image_after' => null,  // Waiting for completion triggers
                 ]);
