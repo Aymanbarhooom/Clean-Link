@@ -16,10 +16,18 @@ class ServiceImage extends Model
     {
         return $this->belongsTo(Service::class);
     }
-    protected function image(): Attribute
+
+    protected function imageBefore(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ? asset('storage/' . $value) : null,
+            get: fn($value) => $value ? asset('storage/' . $value) : null,
+        );
+    }
+
+    protected function imageAfter(): Attribute
+    {
+        return Attribute::make(
+            get: fn($value) => $value ? asset('storage/' . $value) : null,
         );
     }
 }
