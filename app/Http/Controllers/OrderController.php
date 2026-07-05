@@ -187,7 +187,7 @@ class OrderController extends Controller
                 'end_time' => $endTime,
                 'duration' => $totalDuration,
                 'status' => 'pending',
-                'total_price' => $package->price, // Set initial base price
+                'total_price' => $package->price_after_discount,
             ]);
 
             $runningTotalPrice = $package->price;
