@@ -243,8 +243,9 @@ class OrderController extends Controller
 
         // Cascade delete or cancel any assigned tasks linked to this order
         $order->tasks()->delete();
+        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
 
-        return $this->successResponse($order, 'Order cancelled and linked field schedules cleared');
+        return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
     }
 
     /**
