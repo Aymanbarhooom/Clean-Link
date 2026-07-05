@@ -93,7 +93,7 @@ class WorkerSeeder extends Seeder
                 ]);
 
                 // Step D: Attach 3 random skills to the worker
-                $allSkills = Skill::take(16)->get();
+                $allSkills = Skill::take(7)->get();
                 $allSkills = $allSkills->pluck('id')->toArray();
                 if (!empty($allSkills)) {
                     $randomSkills = array_slice($allSkills, 0, min(4, count($allSkills)));
