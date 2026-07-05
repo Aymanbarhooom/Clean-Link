@@ -65,7 +65,7 @@ class TaskController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => 'required|in:on_way,handling,done',
+            'status' => 'required|in:pending,on_way,handling,done',
         ]);
         if ($request->hasFile('image_before')) {
             $validated['image_before'] = $request->file('image_before')->store('task_images', 'public');

@@ -328,7 +328,7 @@ class OrderController extends Controller
             // 1. إنشاء المهمة المرتبطة بالورشة
             $order->tasks()->create([
                 'workgroup_id' => $workgroup->id,
-                'status' => 'on_way' // تبدأ الحالة تلقائياً بـ "في الطريق" عند الإسناد
+                'status' => 'pending' // تبدأ الحالة تلقائياً بـ "في الطريق" عند الإسناد
             ]);
 
             // 2. تحديث حالة الطلب الأساسي للعميل ليعرف أن هناك فريقاً تم تعيينه
