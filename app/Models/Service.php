@@ -27,6 +27,14 @@ class Service extends Model
     ];
     protected $appends = ['is_favorite'];
 
+    protected $casts = [
+        'rating' => 'float',
+        'min_duration' => 'integer',
+        'max_duration' => 'integer',
+        'price' => 'float',
+        'discount' => 'float',
+    ];
+
     // --- Relationships ---
 
     public function company(): BelongsTo

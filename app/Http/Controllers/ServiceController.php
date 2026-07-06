@@ -88,6 +88,7 @@ class ServiceController extends Controller
             'max_duration' => 'required|integer|gte:min_duration',
             'price' => 'required|numeric|min:0',
             'discount' => 'nullable|numeric|min:0|lte:price',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             
             // Nested validation matrix for input properties array
             'attributes' => 'nullable|array',
@@ -145,6 +146,7 @@ class ServiceController extends Controller
             'max_duration' => 'sometimes|integer|gte:min_duration',
             'price' => 'sometimes|numeric|min:0',
             'discount' => 'nullable|numeric|min:0|lte:price',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',

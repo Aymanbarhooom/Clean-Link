@@ -22,12 +22,12 @@ class ServiceResource extends JsonResource
         'category_id' => $this->category_id,
         'name' => $this->{"name_$lang"},
         'description' => $this->{"description_$lang"},
-        'rating' => (float) $this->rating,
+        'rating' => (float) $this->rating !== null ? (float) $this->total_price : null,
         'min_duration' => $this->min_duration,
         'max_duration' => $this->max_duration,
-        'price' => (float) $this->price,
+        'price' => (float) $this->price !== null ? (float) $this->total_price : null,
         'image' => $this->image,
-        'discount' => (float) $this->discount,
+        'discount' => (float) $this->discount !== null ? (float) $this->total_price : null,
         'is_favorite' => $this->is_favorite,
 
         // العلاقات

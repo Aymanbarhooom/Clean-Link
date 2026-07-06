@@ -25,7 +25,7 @@ class Order extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'duration' => 'integer',
-        'total_price' => 'decimal:2',
+        'total_price' => 'float',
     ];
 
     // --- Relationships ---
@@ -54,7 +54,7 @@ class Order extends Model
 
     public function calculateAndSetTotalPrice(): void
     {
-        $basePrice = $this->package->price;
+        $basePrice = $this->package->price_after_discount ?? $this->package->price;
 
         $addonsPrice = $this->attributes()->get()->sum(function ($attribute) {
             return $attribute->pivot->qty * $attribute->pivot->price_at_order;

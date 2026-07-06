@@ -52,16 +52,17 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('category_images', 'public');
-            $validated['image'] = $path;
-        }
         $validated = $request->validate([
             'name_ar' => 'required|string|max:255',
             'name_en' => 'required|string|max:255',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('category_images', 'public');
+            $validated['image'] = $path;
+        }
 
         $category = Category::create($validated);
         return $this->successResponse($category, 'Category established inside index registries', 211);
@@ -72,16 +73,18 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('category_images', 'public');
-            $validated['image'] = $path;
-        }
+      
         $validated = $request->validate([
             'name_ar' => 'sometimes|string|max:255',
             'name_en' => 'sometimes|string|max:255',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
+          if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('category_images', 'public');
+            $validated['image'] = $path;
+        }
 
         $category->update($validated);
         return $this->successResponse($category, 'Category structural configuration parameters modified');
