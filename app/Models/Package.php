@@ -15,7 +15,10 @@ class Package extends Model
      */
     protected $casts = [
         'details_ar' => 'array',
-        'details_en' => 'array'
+        'details_en' => 'array',
+        'duration' => 'integer',
+        'price' => 'float',
+        'price_after_discount' => 'float',
     ];
 
     public function service(): BelongsTo

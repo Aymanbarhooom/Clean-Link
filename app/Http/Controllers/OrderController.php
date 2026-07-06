@@ -173,9 +173,11 @@ class OrderController extends Controller
         $startTime = Carbon::parse($validated['start_time']);
         $totalDuration = $package->duration;
         $endTime = $startTime->copy()->addMinutes($totalDuration);
+        
 
         // Process order mapping inside a safe database transaction block
         $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration) {
+            $basePrice = $package->price_after_discount ?? $package->price;
 
             // 1. Create the base client order profile
             $order = Order::create([
@@ -187,10 +189,10 @@ class OrderController extends Controller
                 'end_time' => $endTime,
                 'duration' => $totalDuration,
                 'status' => 'pending',
-                'total_price' => $package->price_after_discount,
+                'total_price' => $basePrice,
             ]);
 
-            $runningTotalPrice = $package->price;
+            $runningTotalPrice = $basePrice;
 
             // 2. Lock in custom attribute pricing variants
             if (!empty($validated['attributes'])) {

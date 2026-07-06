@@ -43,6 +43,7 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'address' => 'nullable|string|max:500',
             'phone' => 'nullable|string|max:30',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if($request->hasFile('image')) {
             $path = $request->file('image')->store('profiles', 'public');

@@ -34,7 +34,7 @@ class TaskController extends Controller
         ->orderBy('created_at', 'desc')
         ->get();
 
-        return $this->successResponse($tasks, 'Your workgroup tasks logs fetched');
+        return $this->successResponse(TaskResource::collection($tasks), 'Your workgroup tasks logs fetched');
     }
 
     public function show(Task $task): JsonResponse
@@ -66,6 +66,8 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'status' => 'required|in:pending,on_way,handling,done',
+            'image_before' => 'nullable|image|max:2048', // 2MB
+            'image_after' => 'nullable|image|max:2048', // 2MB
         ]);
         if ($request->hasFile('image_before')) {
             $validated['image_before'] = $request->file('image_before')->store('task_images', 'public');
@@ -83,7 +85,8 @@ class TaskController extends Controller
             $order = $task->order;
             $order->update(['status' => 'completed']);
         }
+        $task->load(['order.package.service', 'workgroup.leader']);
 
-        return $this->successResponse($task->load('order'), 'Task progression parameters updated successfully by the leader');
+        return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
     }
 }
