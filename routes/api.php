@@ -160,4 +160,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     Route::get('orders/{order}/qualified-groups', [OrderController::class, 'getQualifiedGroups']);
 
+    // ==========================================
+// 🔔 صندوق وارد الإشعارات (In-App Notifications Inbox)
+// ==========================================
+Route::get('notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
+Route::post('notifications/{notification}/mark-as-read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
 });

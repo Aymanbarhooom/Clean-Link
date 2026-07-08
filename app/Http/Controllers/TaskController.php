@@ -8,6 +8,8 @@ use App\Models\Task;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use App\Services\FirebaseService;
+
 
 class TaskController extends Controller
 {
@@ -30,9 +32,9 @@ class TaskController extends Controller
         $tasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })
-        ->with(['order.package.service', 'workgroup.leader'])
-        ->orderBy('created_at', 'desc')
-        ->get();
+            ->with(['order.package.service', 'workgroup.leader'])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return $this->successResponse(TaskResource::collection($tasks), 'Your workgroup tasks logs fetched');
     }
@@ -48,9 +50,9 @@ class TaskController extends Controller
         if (!$user->isAdmin() && !$task->workgroup->workers()->where('users.id', $user->id)->exists()) {
             return $this->errorResponse('Access restricted to task members only', 403);
         }
-         $task->load(['order.package.service.company', 'order.client', 'workgroup.leader']);
+        $task->load(['order.package.service.company', 'order.client', 'workgroup.leader']);
         return $this->successResponse(
-          new TaskResource($task),
+            new TaskResource($task),
             'Task details retrieved successfully'
         );
     }
@@ -59,6 +61,7 @@ class TaskController extends Controller
     {
         $user = auth()->user();
         $workers = $task->workgroup->workers;
+        $firebaseService = new FirebaseService();
 
         // 💥 القفل الأمني الفذ: فحص هل العامل الحالي هو قائد الورشة الفعلي المسند إليها التاسك؟
         if ($task->workgroup->leader_id !== $user->id) {
@@ -89,10 +92,26 @@ class TaskController extends Controller
                 $worker->workerProfile->status = 'available';
                 $worker->workerProfile->save();
             }
+
         }
         if ($validated['status'] === 'handling') {
             $task->order->update(['status' => 'in_process']);
         }
+        $notification = $order->user->notifications()->create([
+                'title' => 'تحديث حالة الطلب',
+                'body' => "تم تغيير حالة طلبك إلى: #{$order->status}",
+                'is_read' => false,
+            ]);
+            $firebaseService->sendToUser(
+                $order->user,
+                $notification->title,
+                $notification->body,
+                [
+                    'order_id' => $order->id,
+                    'status' => $order->status,
+                    'type' => 'order_status_update',
+                ]
+            );
         $task->load(['order.package.service', 'workgroup.leader']);
 
         return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
