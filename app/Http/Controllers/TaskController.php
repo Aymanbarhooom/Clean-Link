@@ -58,6 +58,7 @@ class TaskController extends Controller
     public function updateStatus(Request $request, Task $task): JsonResponse
     {
         $user = auth()->user();
+        $workers = $task->workgroup->workers;
 
         // 💥 القفل الأمني الفذ: فحص هل العامل الحالي هو قائد الورشة الفعلي المسند إليها التاسك؟
         if ($task->workgroup->leader_id !== $user->id) {
@@ -84,6 +85,10 @@ class TaskController extends Controller
             $task->advanceStatus('done');
             $order = $task->order;
             $order->update(['status' => 'completed']);
+            foreach ($workers as $worker) {
+                $worker->workerProfile->status = 'available';
+                $worker->workerProfile->save();
+            }
         }
         $task->load(['order.package.service', 'workgroup.leader']);
 

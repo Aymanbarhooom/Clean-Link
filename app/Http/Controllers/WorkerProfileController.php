@@ -50,10 +50,12 @@ class WorkerProfileController extends Controller
 
         $validated = $request->validate([
             'experience_years' => 'required|integer|min:0',
+            'status'=>'required|string|in:active,inactive',
         ]);
 
         $worker->workerProfile()->update([
-            'experience_years' => $validated['experience_years']
+            'experience_years' => $validated['experience_years'],
+            'status' => $validated['status'],
         ]);
 
         return $this->successResponse(

@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class WorkerProfile extends Model
 {
-    protected $fillable = ['user_id', 'company_id', 'experience_years', 'rating'];
+    protected $fillable = ['user_id', 'company_id', 'experience_years', 'rating','status'];
     protected $appends = ['is_leader'];
     protected $casts = [
         'experience_years' => 'integer',
         'rating' => 'float',
+        'status' => 'string',
     ];
 
     public function user(): BelongsTo
