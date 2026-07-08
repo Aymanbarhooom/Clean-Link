@@ -90,6 +90,9 @@ class TaskController extends Controller
                 $worker->workerProfile->save();
             }
         }
+        if ($validated['status'] === 'handling') {
+            $task->order->update(['status' => 'in_process']);
+        }
         $task->load(['order.package.service', 'workgroup.leader']);
 
         return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
