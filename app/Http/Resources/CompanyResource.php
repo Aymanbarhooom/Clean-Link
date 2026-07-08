@@ -32,6 +32,7 @@ class CompanyResource extends JsonResource
         'services' => ServiceResource::collection($this->whenLoaded('services')),
         'workers' => $this->whenLoaded('workers'),
         'reviews' => $this->whenLoaded('reviews'), // يفضل عمل ReviewResource لاحقاً
+        'workTimes' => $this->whenLoaded('workTimes'),
 
         'created_at' => $this->created_at,
         'updated_at' => $this->updated_at,

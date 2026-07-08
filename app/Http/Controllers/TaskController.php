@@ -48,7 +48,7 @@ class TaskController extends Controller
         if (!$user->isAdmin() && !$task->workgroup->workers()->where('users.id', $user->id)->exists()) {
             return $this->errorResponse('Access restricted to task members only', 403);
         }
-         $task->load(['order.package.service', 'workgroup.leader']);
+         $task->load(['order.package.service.company', 'order.client', 'workgroup.leader']);
         return $this->successResponse(
           new TaskResource($task),
             'Task details retrieved successfully'

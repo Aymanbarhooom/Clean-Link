@@ -41,12 +41,12 @@ class ProfileController extends Controller
 
         // Validate the incoming request data
         $validated = $request->validate([
-            'address' => 'nullable|string|max:500',
-            'phone' => 'nullable|string|max:30',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
+            'address' => 'required|regex:/^[a-zA-Z0-9\s\-_]+$/|max:500',
+            'phone' => 'required|regex:/^[0-9\s\-\(\)]+$/|max:30',
+            'image' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if($request->hasFile('image')) {
-            $path = $request->file('image')->store('profiles', 'public');
+            $path = $request->file('image')->store('worker_profiles', 'public');
             $validated['image'] = $path;
         }
 
