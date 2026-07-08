@@ -23,7 +23,7 @@ class OrderResource extends JsonResource
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
             'duration' => $this->duration,
-            'total_price' => $this->total_price !== null ? (float) $this->total_price : null,
+            'total_price' => $this->total_price ,
             'note' => $this->note,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

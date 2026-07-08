@@ -114,7 +114,7 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:30',
             'address' => 'nullable|string|max:500',
-            'image' => 'nullable|string', // Base64 or uploaded file path string
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if($request->hasFile('image')) {
             $path = $request->file('image')->store('profile_images', 'public');

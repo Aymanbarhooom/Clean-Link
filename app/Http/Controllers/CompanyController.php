@@ -175,7 +175,7 @@ class CompanyController extends Controller
     public function showCompany(Company $company): JsonResponse
     {
         $this->authorize('view', $company);
-        $company->load(['region', 'services', 'workers.user.profile', 'reviews.client.profile']);
+        $company->load(['region', 'services', 'workers.user.profile', 'reviews.client.profile','workTimes']);
         $user = auth()->user();
         if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
             return $this->successResponse($company, 'Company profile retrieved');
