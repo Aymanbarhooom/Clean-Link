@@ -17,7 +17,7 @@ return new class extends Migration
             $table->dateTime('start_time');
             $table->dateTime('end_time')->nullable();
             $table->integer('duration')->comment('Package block duration in minutes')->nullable();
-            $table->enum('status', ['pending', 'assigned_to_worker', 'canceled', 'completed'])->default('pending');
+            $table->enum('status', ['pending', 'assigned_to_worker', 'in_process', 'canceled', 'completed'])->default('pending');
             $table->decimal('total_price', 10, 2);
             $table->timestamps();
         });
