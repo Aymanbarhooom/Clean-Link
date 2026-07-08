@@ -154,7 +154,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     Route::get('tasks', [TaskController::class, 'index']); // جلب المهام (متاح لكل العمال في الورشة)
     Route::get('tasks/{task}', [TaskController::class, 'show']); // جلب تفاصيل المهمة
-    Route::put('tasks/{task}/update-status', [TaskController::class, 'updateStatus']); // تحديث ورفع الصور (للقائد فقط)
+    Route::post('tasks/{task}/update-status', [TaskController::class, 'updateStatus']); // تحديث ورفع الصور (للقائد فقط)
     // ==========================================
     // 🧠 Smart Dashboard Dispatch Indicators
     // ==========================================
