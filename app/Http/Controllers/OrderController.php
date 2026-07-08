@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Package;
 use App\Models\Order;
+use App\Models\User;
 use App\Models\Workgroup;
+use App\Services\FirebaseService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -337,6 +339,44 @@ class OrderController extends Controller
             // 2. تحديث حالة الطلب الأساسي للعميل ليعرف أن هناك فريقاً تم تعيينه
             $order->update(['status' => 'assigned_to_worker']);
         });
+        $workers = $workgroup->workers()->pluck('id')->toArray();
+        $client = $order->client;
+        $firebaseService = new FirebaseService();
+        foreach ($workers as $workerId) {
+            $worker = User::find($workerId);
+            if ($worker && $worker->fcm_token) {
+                $firebaseService->sendToToken(
+                    $worker->fcm_token,
+                    'New Task Assigned',
+                    "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
+                    [
+                        'order_id' => (string)$order->id,
+                        'task_id' => (string)$order->tasks()->latest()->first()->id,
+                        'client_name' => $client->name,
+                        'client_location' => $order->location,
+                    ]
+                );
+                $worker->notifications()->create([
+                    'title' => 'New Task Assigned',
+                    'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
+                ]);
+            }
+        }
+        $firebaseService->sendToToken(
+                    $client->fcm_token,
+                    'Task Assigned to Workgroup',
+                    "Your task for Order #{$order->id} has been assigned to a workgroup..",
+                    [
+                        'order_id' => (string)$order->id,
+                        'task_id' => (string)$order->tasks()->latest()->first()->id,
+                        'client_name' => $client->name,
+                        'client_location' => $order->location,
+                    ]
+                );
+        $notification = $client->notifications()->create([
+            'title' => 'Order Assigned to Workgroup',
+            'body' => "Your order #{$order->id} has been assigned to a workgroup. The team will contact you shortly.",
+        ]);
 
         return $this->successResponse($order->load('tasks.workgroup'), 'Order successfully assigned to the workgroup crew', 211);
     }
