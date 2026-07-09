@@ -175,7 +175,7 @@ class OrderController extends Controller
         $startTime = Carbon::parse($validated['start_time']);
         $totalDuration = $package->duration;
         $endTime = $startTime->copy()->addMinutes($totalDuration);
-        
+
 
         // Process order mapping inside a safe database transaction block
         $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration) {
@@ -288,7 +288,7 @@ class OrderController extends Controller
             $query->orderBy('created_at', 'desc');
             return $this->successResponse(OrderResource::collection($query->get()), 'Orders index fetched successfully');
         }
-        
+
         return $this->successResponse($query->orderBy('created_at', 'desc')->get(), 'Orders index fetched successfully');
     }
 
@@ -306,7 +306,7 @@ class OrderController extends Controller
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
 
-        /**
+    /**
      * إسناد الطلب لورشة عمل معينة وإنشاء المهمة (خاص بمدير الشركة)
      * Route: POST /api/orders/{order}/assign
      */
@@ -341,11 +341,11 @@ class OrderController extends Controller
         });
         $workers = $workgroup->workers()->pluck('id')->toArray();
         $client = $order->client;
-        $firebaseService = new FirebaseService();
+        //$firebaseService = new FirebaseService();
         foreach ($workers as $workerId) {
             $worker = User::find($workerId);
             if ($worker && $worker->fcm_token) {
-                $firebaseService->sendToToken(
+                /*$firebaseService->sendToToken(
                     $worker->fcm_token,
                     'New Task Assigned',
                     "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
@@ -355,25 +355,25 @@ class OrderController extends Controller
                         'client_name' => $client->name,
                         'client_location' => $order->location,
                     ]
-                );
+                );*/
                 $worker->notifications()->create([
                     'title' => 'New Task Assigned',
                     'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
                 ]);
             }
         }
-        $firebaseService->sendToToken(
-                    $client->fcm_token,
-                    'Task Assigned to Workgroup',
-                    "Your task for Order #{$order->id} has been assigned to a workgroup..",
-                    [
-                        'order_id' => (string)$order->id,
-                        'task_id' => (string)$order->tasks()->latest()->first()->id,
-                        'client_name' => $client->name,
-                        'client_location' => $order->location,
-                    ]
-                );
-        $notification = $client->notifications()->create([
+        /* $firebaseService->sendToToken(
+                     $client->fcm_token,
+                     'Task Assigned to Workgroup',
+                     "Your task for Order #{$order->id} has been assigned to a workgroup..", 
+                     [
+                         'order_id' => (string)$order->id,
+                         'task_id' => (string)$order->tasks()->latest()->first()->id,
+                         'client_name' => $client->name,
+                         'client_location' => $order->location,
+                     ]
+                 );*/
+            $client->notifications()->create([
             'title' => 'Order Assigned to Workgroup',
             'body' => "Your order #{$order->id} has been assigned to a workgroup. The team will contact you shortly.",
         ]);
@@ -381,7 +381,7 @@ class OrderController extends Controller
         return $this->successResponse($order->load('tasks.workgroup'), 'Order successfully assigned to the workgroup crew', 211);
     }
 
-        /**
+    /**
      * Fetch qualified and available workgroups capable of handling a specific order.
      * Assists the Company Manager by filtering crews by required skills and scheduling availability.
      * Route: GET /api/orders/{order}/qualified-groups
@@ -408,11 +408,11 @@ class OrderController extends Controller
             ->with(['leader.profile', 'workers.profile', 'workers.workerProfile.skills'])
             ->get()
             ->filter(function ($workgroup) use ($requiredSkillIds, $orderStart, $orderEnd) {
-                
+
                 // --- CRITERIA 1: Competency Skill Matching ---
                 $groupSkills = $workgroup->getCombinedSkillIds();
                 $hasSkillsMatch = empty(array_diff($requiredSkillIds, $groupSkills));
-                
+
                 if (!$hasSkillsMatch) {
                     return false; // Discard if the team lacks the required training credentials
                 }
@@ -420,13 +420,13 @@ class OrderController extends Controller
                 // --- CRITERIA 2: Calendar Availability / Scheduling Overlaps ---
                 $hasTimeConflict = Order::where('status', '!=', 'canceled')
                     ->whereHas('tasks', function ($query) use ($workgroup) {
-                        $query->where('workgroup_id', $workgroup->id);
-                    })
+                    $query->where('workgroup_id', $workgroup->id);
+                })
                     ->where(function ($query) use ($orderStart, $orderEnd) {
-                        // Standard scheduling block collision intersection check
-                        $query->where('start_time', '<', $orderEnd)
-                              ->where('end_time', '>', $orderStart);
-                    })
+                    // Standard scheduling block collision intersection check
+                    $query->where('start_time', '<', $orderEnd)
+                        ->where('end_time', '>', $orderStart);
+                })
                     ->exists();
 
                 return !$hasTimeConflict; // Keep the group only if they have no scheduling conflicts
@@ -434,7 +434,7 @@ class OrderController extends Controller
             ->values(); // Reset the collection index keys for clean JSON array sequence formatting
 
         return $this->successResponse(
-            $qualifiedGroups, 
+            $qualifiedGroups,
             'Qualified and available workgroups filtered successfully for dispatch'
         );
     }

@@ -84,23 +84,27 @@ class AuthController extends Controller
      * Route endpoint: POST /api/auth/fcm-token
      */
     public function updateFcmToken(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'fcm_token' => 'required|string',
-            'device_type' => 'nullable|string|in:android,ios,web',
-        ]);
+{
+    $validated = $request->validate([
+        'fcm_token'   => 'required|string',
+        'device_type' => 'nullable|string|in:android,ios,web',
+        'lang'        => 'nullable|string|size:2', 
+    ]);
 
-        // upsert token context bound cleanly to authenticating sessions
-        $tokenRecord = FcmToken::updateOrCreate(
-            ['token' => $validated['fcm_token']],
-            [
-                'user_id' => auth()->id(),
-                'device_type' => $validated['device_type'] ?? null
-            ]
-        );
+    $deviceLang = $validated['lang'] ?? app()->getLocale();
 
-        return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
-    }
+    $tokenRecord = FcmToken::updateOrCreate(
+        ['token' => $validated['fcm_token']],
+        [
+            'user_id'     => auth()->id(),
+            'device_type' => $validated['device_type'] ?? null,
+            'lang'        => $deviceLang
+        ]
+    );
+
+    return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
+}
+
     /**
      * Update Account Profile Information (User + Profile Models)
      * Route: PUT /api/auth/profile/update
