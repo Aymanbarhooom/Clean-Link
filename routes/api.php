@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AuthController;
@@ -163,6 +164,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
 // 🔔 صندوق وارد الإشعارات (In-App Notifications Inbox)
 // ==========================================
-Route::get('notifications', [\App\Http\Controllers\Api\NotificationController::class, 'index']);
-Route::post('notifications/{notification}/mark-as-read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+Route::get('notifications', [NotificationController::class, 'index']);
+Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead']);
 });
