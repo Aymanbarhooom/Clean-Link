@@ -8,7 +8,7 @@ use App\Models\Package;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Workgroup;
-use App\Services\FirebaseService;
+use App\Services\FirebaseNotificationService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -25,36 +25,32 @@ class OrderController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    /**
-     * 7-Day Advanced Intersection Scheduling Engine.
-     * Route: GET /api/packages/{package}/available-slots
-     */
-    /**
-     * محرك حساب الأوقات الشاغرة المطور (دعم جدول الدوام، العطل، والحجز الفوري من اليوم)
-     * Route: GET /api/packages/{package}/available-slots
-     */
     public function getAvailableSlots(Package $package): JsonResponse
     {
         $service = $package->service;
         $company = $service->company;
-        $packageDuration = $package->duration; // بالدقائق
+        $packageDuration = $package->duration; // minutes
 
         $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-        $eligibleWorkgroups = Workgroup::where('company_id', $company->id)
-            ->get()
-            ->filter(function ($workgroup) use ($requiredSkillIds) {
-                $workerSkills = $workgroup->getCombinedSkillIds();
-                return empty(array_diff($requiredSkillIds, $workerSkills));
-            });
+        $minimumWorkers = (int) ($package->minimum_workers ?? 1);
 
-        if ($eligibleWorkgroups->isEmpty()) {
-            return $this->successResponse([], 'No qualified workgroups are currently available for this service');
+        // Fetch company workers who have at least one of the required skills
+        $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
+            $q->where('company_id', $company->id);
+        })
+            ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
+                $q->whereIn('skills.id', $requiredSkillIds);
+            })
+            ->with(['workerProfile.skills'])
+            ->get();
+
+        if ($eligibleWorkers->count() < $minimumWorkers) {
+            return $this->errorResponse('Not enough eligible workers to satisfy the package minimum', 422);
         }
 
-        // 2. جلب جدول مواعيد العمل للشركة بالكامل وتخزينه كـ Collection للبحث السريع بكود اليوم
+        // company work times
         $workTimes = $company->workTimes()->get()->keyBy('day_of_week');
 
-        // 3. بناء مصفوفة الـ 7 أيام تبدأ من "اليوم" (Now) وتنتهي بعد 6 أيام
         $startDate = Carbon::now();
         $endDate = Carbon::now()->addDays(6);
         $period = CarbonPeriod::create($startDate, $endDate);
@@ -63,72 +59,77 @@ class OrderController extends Controller
 
         foreach ($period as $date) {
             $currentDayKey = $date->format('Y-m-d');
-            $dayOfWeek = $date->dayOfWeek; // يرجع 0 للأحد، 1 للاثنين... حتى 6 للسبت متوافق مع جدولك
+            $dayOfWeek = $date->dayOfWeek;
 
-            // فحص هل هذا اليوم مسجل في جدول الدوام وهل هو عطلة؟
             $daySetting = $workTimes->get($dayOfWeek);
             if (!$daySetting || $daySetting->is_holiday || !$daySetting->open_at || !$daySetting->close_at) {
-                // إذا كان اليوم عطلة، نرجعه كمصفوفة فارغة لـ لفرونت إند ولا نحسب له أي Slots
                 $scheduleMatrix[$currentDayKey] = [];
                 continue;
             }
 
-            // تحديد ساعات العمل الفتح والإغلاق لهذا اليوم بالتحديد من الـ Database
             $openHourStr = Carbon::parse($daySetting->open_at)->format('H:i');
             $closeHourStr = Carbon::parse($daySetting->close_at)->format('H:i');
 
-            // تحويل الساعات الممتدة لنصوص إلى Object زمني كامل مربوط بتاريخ اليوم الحالي في الحلقة
             $companyOpenTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $openHourStr);
             $companyCloseTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $closeHourStr);
 
-            // 4. تطبيق معادلة تقريب الموعد الحالي (إذا كنا نفحص اليوم الحاضر)
             if ($date->isToday()) {
                 $now = Carbon::now();
-
-                // تقريب الدقائق إلى الخلف (Round Down) إلى 00 أو 30
                 $roundedNow = $now->copy();
-
-                // إضافة 30 دقيقة إذا كانت الدقائق أقل من 30
                 if ($now->minute < 30) {
                     $roundedNow->minute(30)->second(0);
                 } else {
-                    // إذا كانت الدقائق 30 أو أكثر، نضيف ساعة ونضبط الدقائق إلى 0
                     $roundedNow->addHour()->minute(0)->second(0);
                 }
-
-
-                // إضافة ساعة كاملة كـ (Buffer / هامش أمان) لمعالجة الـ Slots والتحضير
                 $earliestPossibleStart = $roundedNow->addHour();
-
-                // نقطة البدء لليوم تكون الأكبر بين: (وقت فتح الشركة) أو (الوقت الحالي المقرب + ساعة الأمان)
                 $loopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
             } else {
-                // للأيام المستقبلية: البدء يكون دائماً من ساعة فتح الشركة الرسمية في ذلك اليوم
                 $loopTime = $companyOpenTime;
             }
 
             $scheduleMatrix[$currentDayKey] = [];
 
-            // 5. حلقة فحص الـ Slots المتاحة كل 30 دقيقة
             while ($loopTime->copy()->addMinutes($packageDuration)->lte($companyCloseTime)) {
                 $slotStart = $loopTime->copy();
                 $slotEnd = $loopTime->copy()->addMinutes($packageDuration);
 
                 $isSlotAvailable = false;
 
-                // فحص التقاطع الجدولي (Overlap) مع الورش المؤهلة
-                foreach ($eligibleWorkgroups as $workgroup) {
-                    $hasOverlapConflict = Order::where('status', '!=', 'canceled')
-                        ->whereHas('tasks', function ($query) use ($workgroup) {
-                            $query->where('workgroup_id', $workgroup->id);
-                        })
-                        ->where(function ($query) use ($slotStart, $slotEnd) {
-                            $query->where('start_time', '<', $slotEnd)
-                                ->where('end_time', '>', $slotStart);
-                        })
-                        ->exists();
+                // generate combinations of workers of size minimumWorkers
+                $workerCombinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
 
-                    if (!$hasOverlapConflict) {
+                foreach ($workerCombinations as $combo) {
+                    // combined skills
+                    $combined = collect($combo)
+                        ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
+                        ->flatten()
+                        ->unique()
+                        ->toArray();
+
+                    if (!empty(array_diff($requiredSkillIds, $combined))) {
+                        continue;
+                    }
+
+                    // check availability for all workers in combo
+                    $conflict = false;
+                    foreach ($combo as $worker) {
+                        $hasOverlap = Order::where('status', '!=', 'canceled')
+                            ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
+                                $q->where('users.id', $worker->id);
+                            })
+                            ->where(function ($q) use ($slotStart, $slotEnd) {
+                                $q->where('start_time', '<', $slotEnd)
+                                    ->where('end_time', '>', $slotStart);
+                            })
+                            ->exists();
+
+                        if ($hasOverlap) {
+                            $conflict = true;
+                            break;
+                        }
+                    }
+
+                    if (!$conflict) {
                         $isSlotAvailable = true;
                         break;
                     }
@@ -138,18 +139,13 @@ class OrderController extends Controller
                     $scheduleMatrix[$currentDayKey][] = $slotStart->format('H:i');
                 }
 
-                $loopTime->addMinutes(30); // الانتقال لنصف الساعة التالية
+                $loopTime->addMinutes(30);
             }
         }
 
         return $this->successResponse($scheduleMatrix, 'Dynamic slots mapped across active work-time sheets successfully');
     }
 
-
-    /**
-     * Store and secure a client order with real-time financial tracking.
-     * Route: POST /api/orders
-     */
     public function store(Request $request): JsonResponse
     {
         if (auth()->user()->role !== 'client') {
@@ -162,7 +158,6 @@ class OrderController extends Controller
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
 
-            // Nested pricing addons validation parameters
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
@@ -171,17 +166,13 @@ class OrderController extends Controller
         $package = Package::with('service.company')->find($validated['package_id']);
         $service = $package->service;
 
-        // Calculate time parameters based on the core package selection
         $startTime = Carbon::parse($validated['start_time']);
         $totalDuration = $package->duration;
         $endTime = $startTime->copy()->addMinutes($totalDuration);
 
-
-        // Process order mapping inside a safe database transaction block
         $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration) {
             $basePrice = $package->price_after_discount ?? $package->price;
 
-            // 1. Create the base client order profile
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -196,15 +187,11 @@ class OrderController extends Controller
 
             $runningTotalPrice = $basePrice;
 
-            // 2. Lock in custom attribute pricing variants
             if (!empty($validated['attributes'])) {
                 $pivotPayload = [];
 
                 foreach ($validated['attributes'] as $item) {
-                    // Extract historic values from the service definition pivot
                     $serviceAttributePivot = $service->attributes()->where('attributes.id', $item['id'])->first();
-
-                    // Fallback to 0.00 if the company hasn't configured custom pricing for this attribute
                     $priceAtOrder = $serviceAttributePivot ? $serviceAttributePivot->pivot->price : 0.00;
 
                     $pivotPayload[$item['id']] = [
@@ -215,17 +202,139 @@ class OrderController extends Controller
                     $runningTotalPrice += ($priceAtOrder * $item['qty']);
                 }
 
-                // Attach to the order invoice history ledger
                 $order->attributes()->attach($pivotPayload);
             }
 
-            // 3. Update the final calculated total cost
             $order->update(['total_price' => $runningTotalPrice]);
 
             return $order;
         });
 
         $order->load(['package.service', 'attributes']);
+
+        // Automatic assignment
+        try {
+            $service = $package->service;
+            $company = $service->company;
+            $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
+            $minimumWorkers = (int) ($package->minimum_workers ?? 1);
+
+            $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
+                $q->where('company_id', $company->id);
+            })
+                ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
+                    $q->whereIn('skills.id', $requiredSkillIds);
+                })
+                ->with(['workerProfile.skills', 'profile'])
+                ->get();
+
+            if ($eligibleWorkers->count() >= $minimumWorkers) {
+                $combinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
+                $found = null;
+                foreach ($combinations as $combo) {
+                    $combined = collect($combo)
+                        ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
+                        ->flatten()
+                        ->unique()
+                        ->toArray();
+
+                    if (!empty(array_diff($requiredSkillIds, $combined))) {
+                        continue;
+                    }
+
+                    $conflict = false;
+                    foreach ($combo as $worker) {
+                        $hasOverlap = Order::where('status', '!=', 'canceled')
+                            ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
+                                $q->where('users.id', $worker->id);
+                            })
+                            ->where(function ($q) use ($startTime, $endTime) {
+                                $q->where('start_time', '<', $endTime)
+                                    ->where('end_time', '>', $startTime);
+                            })
+                            ->exists();
+
+                        if ($hasOverlap) {
+                            $conflict = true;
+                            break;
+                        }
+                    }
+
+                    if (!$conflict) {
+                        $found = $combo;
+                        break;
+                    }
+                }
+
+                if ($found) {
+                    $leader = collect($found)->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)->first();
+
+                    $workgroup = Workgroup::create([
+                        'company_id' => $company->id,
+                        'name' => 'Auto WG #' . $order->id . ' ' . now()->format('YmdHis'),
+                        'leader_id' => $leader->id,
+                    ]);
+
+                    $workerIds = collect($found)->pluck('id')->toArray();
+                    $workgroup->workers()->attach($workerIds);
+
+                    DB::transaction(function () use ($order, $workgroup) {
+                        $order->tasks()->create([
+                            'workgroup_id' => $workgroup->id,
+                            'status' => 'pending'
+                        ]);
+                        $order->update(['status' => 'assigned_to_worker']);
+                    });
+                    $newTaskNotifications = [
+                        'ar' => [
+                            'title' => 'مهمة جديدة تم تعيينها',
+                            'body' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
+                            'status' => 'قيد المعالجة',
+                        ],
+                        'en' => [
+                            'title' => 'New Task Assigned',
+                            'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
+                            'status' => 'in_process',
+                        ]
+                    ];
+
+                    foreach ($found as $worker) {
+                        if ($worker && $worker->fcm_token) {
+                            $worker->notifications()->create([
+                                'title_ar' => 'تم تعيين مهمة جديدة',
+                                'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
+                                'title_en' => 'New Task Assigned',
+                                'body_en' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
+                                'data' => [
+                                    'type' => 'new_task_assigned',
+                                    'order_id' => $order->id,
+                                    'status' => 'assigned_to_worker',
+                                ],
+                            ]);
+                        }
+                    }
+                    foreach ($found as $worker) {
+                        foreach ($worker->fcmTokens as $token) {
+                            $notificationTitle = $newTaskNotifications[$token->lang]['title'] ?? $newTaskNotifications['en']['title'];
+                            $notificationBody = $newTaskNotifications[$token->lang]['body'] ?? $newTaskNotifications['en']['body'];
+                            app(FirebaseNotificationService::class)->sendPushNotification(
+                                $token->token,
+                                $notificationTitle,
+                                $notificationBody,
+                                [
+                                    'notification_id' => $worker->notifications()->latest()->first()->id,
+                                    'type' => 'new_task_assigned',
+                                    'order_id' => $order->id,
+                                    'status' => 'assigned_to_worker',
+                                ]
+                            );
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // proceed quietly; order stays pending if assignment fails
+        }
 
         return $this->successResponse(
             new OrderResource($order),
@@ -234,42 +343,33 @@ class OrderController extends Controller
         );
     }
 
-    /**
-     * Cancel a pending order entry safely.
-     * Route: POST /api/orders/{order}/cancel
-     */
     public function cancel(Order $order): JsonResponse
     {
-        // Authorize using the Order Policy rules we defined earlier
         $this->authorize('cancel', $order);
-
+        if ($order->status == 'canceled') {
+            return $this->errorResponse('This order has already been canceled', 422);
+        } elseif ($order->status == 'completed' || $order->status == 'in_progress' || $order->status == 'assigned_to_worker') {
+            return $this->errorResponse('This order cannot be canceled', 422);
+        }
         $order->update(['status' => 'canceled']);
 
-        // Cascade delete or cancel any assigned tasks linked to this order
         $order->tasks()->delete();
         $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
 
         return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
     }
 
-    /**
-     * استعراض الطلبات بناءً على الصلاحيات والأدوار المحددة في الـ Policy
-     * Route: GET /api/orders
-     */
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Order::class);
 
         $user = auth()->user();
 
-        // بناء الاستعلام مع الـ Eager Loading لمنع الـ N+1 Query Problem
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup']);
 
-        // تطبيق الفلترة الصارمة بناءً على دور المستخدم
         if ($user->isAdmin()) {
-            // الأدمن يرى كل شيء في النظام
+            // admin sees everything
         } elseif ($user->isCompanyManager()) {
-            // مدير الشركة يرى طلبات باقات خدمات شركته فقط
             $company = $user->managedCompanies()->first();
             if (!$company)
                 return $this->successResponse([], 'No company registered');
@@ -278,12 +378,10 @@ class OrderController extends Controller
                 $q->where('company_id', $company->id);
             });
         } elseif ($user->role === 'region_manager') {
-            // مدير المنطقة يرى طلبات الشركات الواقعة في منطقته الإدارية
             $query->whereHas('package.service.company', function ($q) use ($user) {
                 $q->where('region_id', $user->managedRegions()->pluck('id'));
             });
         } else {
-            // العميل يرى طلباته الشخصية فقط
             $query->where('client_id', $user->id);
             $query->orderBy('created_at', 'desc');
             return $this->successResponse(OrderResource::collection($query->get()), 'Orders index fetched successfully');
@@ -292,13 +390,8 @@ class OrderController extends Controller
         return $this->successResponse($query->orderBy('created_at', 'desc')->get(), 'Orders index fetched successfully');
     }
 
-    /**
-     * عرض تفاصيل طلب محدد بعد فحص الصلاحية
-     * Route: GET /api/orders/{order}
-     */
     public function show(Order $order): JsonResponse
     {
-        // فحص الصلاحية عبر الـ Policy (العميل يرى طلبه، المدير يرى طلبات شركته...)
         $this->authorize('view', $order);
 
         $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
@@ -307,136 +400,39 @@ class OrderController extends Controller
     }
 
     /**
-     * إسناد الطلب لورشة عمل معينة وإنشاء المهمة (خاص بمدير الشركة)
-     * Route: POST /api/orders/{order}/assign
+     * Generate combinations of $k items from $items array (array of objects)
+     * Returns array of arrays (each is a combination)
      */
-    public function assignToWorkgroup(Request $request, Order $order): JsonResponse
+    private function combinations(array $items, int $k): array
     {
-        // التحقق من أن المستخدم الحالي هو مدير الشركة التي تملك هذه الخدمة
-        if (auth()->user()->id !== $order->package->service->company->manager_id) {
-            return $this->errorResponse('Unauthorized company domain access block', 403);
-        }
+        $results = [];
+        $n = count($items);
+        if ($k <= 0 || $k > $n)
+            return [];
 
-        $validated = $request->validate([
-            'workgroup_id' => 'required|exists:workgroups,id',
-        ]);
+        $indices = range(0, $k - 1);
 
-        $workgroup = Workgroup::find($validated['workgroup_id']);
+        while (true) {
+            $combo = [];
+            foreach ($indices as $i) {
+                $combo[] = $items[$i];
+            }
+            $results[] = $combo;
 
-        // التأكد من أن الورشة المحددة تابعة لنفس الشركة
-        if ($workgroup->company_id !== $order->package->service->company_id) {
-            return $this->errorResponse('The selected workgroup does not belong to your company', 422);
-        }
-
-        // تنفيذ عملية الإسناد المزدوجة داخل Transaction لضمان سلامة البيانات
-        DB::transaction(function () use ($order, $workgroup) {
-            // 1. إنشاء المهمة المرتبطة بالورشة
-            $order->tasks()->create([
-                'workgroup_id' => $workgroup->id,
-                'status' => 'pending' // تبدأ الحالة تلقائياً بـ "في الطريق" عند الإسناد
-            ]);
-
-            // 2. تحديث حالة الطلب الأساسي للعميل ليعرف أن هناك فريقاً تم تعيينه
-            $order->update(['status' => 'assigned_to_worker']);
-        });
-        $workers = $workgroup->workers()->pluck('id')->toArray();
-        $client = $order->client;
-        //$firebaseService = new FirebaseService();
-        foreach ($workers as $workerId) {
-            $worker = User::find($workerId);
-            if ($worker && $worker->fcm_token) {
-                /*$firebaseService->sendToToken(
-                    $worker->fcm_token,
-                    'New Task Assigned',
-                    "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                    [
-                        'order_id' => (string)$order->id,
-                        'task_id' => (string)$order->tasks()->latest()->first()->id,
-                        'client_name' => $client->name,
-                        'client_location' => $order->location,
-                    ]
-                );*/
-                $worker->notifications()->create([
-                    'title' => 'New Task Assigned',
-                    'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                ]);
+            // move to next
+            $i = $k - 1;
+            while ($i >= 0 && $indices[$i] == $i + $n - $k) {
+                $i--;
+            }
+            if ($i < 0)
+                break;
+            $indices[$i]++;
+            for ($j = $i + 1; $j < $k; $j++) {
+                $indices[$j] = $indices[$j - 1] + 1;
             }
         }
-        /* $firebaseService->sendToToken(
-                     $client->fcm_token,
-                     'Task Assigned to Workgroup',
-                     "Your task for Order #{$order->id} has been assigned to a workgroup..", 
-                     [
-                         'order_id' => (string)$order->id,
-                         'task_id' => (string)$order->tasks()->latest()->first()->id,
-                         'client_name' => $client->name,
-                         'client_location' => $order->location,
-                     ]
-                 );*/
-            $client->notifications()->create([
-            'title' => 'Order Assigned to Workgroup',
-            'body' => "Your order #{$order->id} has been assigned to a workgroup. The team will contact you shortly.",
-        ]);
 
-        return $this->successResponse($order->load('tasks.workgroup'), 'Order successfully assigned to the workgroup crew', 211);
-    }
-
-    /**
-     * Fetch qualified and available workgroups capable of handling a specific order.
-     * Assists the Company Manager by filtering crews by required skills and scheduling availability.
-     * Route: GET /api/orders/{order}/qualified-groups
-     */
-    public function getQualifiedGroups(Order $order): JsonResponse
-    {
-        $user = auth()->user();
-        $service = $order->package->service;
-        $company = $service->company;
-
-        // Security Boundary: Ensure only the managing Company Manager can query this data
-        if ($user->id !== $company->manager_id && !$user->isAdmin()) {
-            return $this->errorResponse('Unauthorized company domain access block', 403);
-        }
-
-        // 1. Identify the baseline prerequisite skill IDs required by this service
-        $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-
-        $orderStart = $order->start_time;
-        $orderEnd = $order->end_time;
-
-        // 2. Fetch all company crews, then apply real-time double filters
-        $qualifiedGroups = Workgroup::where('company_id', $company->id)
-            ->with(['leader.profile', 'workers.profile', 'workers.workerProfile.skills'])
-            ->get()
-            ->filter(function ($workgroup) use ($requiredSkillIds, $orderStart, $orderEnd) {
-
-                // --- CRITERIA 1: Competency Skill Matching ---
-                $groupSkills = $workgroup->getCombinedSkillIds();
-                $hasSkillsMatch = empty(array_diff($requiredSkillIds, $groupSkills));
-
-                if (!$hasSkillsMatch) {
-                    return false; // Discard if the team lacks the required training credentials
-                }
-
-                // --- CRITERIA 2: Calendar Availability / Scheduling Overlaps ---
-                $hasTimeConflict = Order::where('status', '!=', 'canceled')
-                    ->whereHas('tasks', function ($query) use ($workgroup) {
-                    $query->where('workgroup_id', $workgroup->id);
-                })
-                    ->where(function ($query) use ($orderStart, $orderEnd) {
-                    // Standard scheduling block collision intersection check
-                    $query->where('start_time', '<', $orderEnd)
-                        ->where('end_time', '>', $orderStart);
-                })
-                    ->exists();
-
-                return !$hasTimeConflict; // Keep the group only if they have no scheduling conflicts
-            })
-            ->values(); // Reset the collection index keys for clean JSON array sequence formatting
-
-        return $this->successResponse(
-            $qualifiedGroups,
-            'Qualified and available workgroups filtered successfully for dispatch'
-        );
+        return $results;
     }
 
 }
