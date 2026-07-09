@@ -24,6 +24,7 @@ class PackageResource extends JsonResource
             'price' => (float) $this->price,
             'price_after_discount' => (float) $this->price_after_discount,
             'details' => is_string($this->{"details_$lang"}) ? json_decode($this->{"details_$lang"}, true) : $this->{"details_$lang"},
+            'minimum_workers' => $this->minimum_workers,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             // العلاقات

@@ -39,6 +39,7 @@ class PackageSeeder extends Seeder
                         'Ideal for spaces under 60m²',
                         'Includes 2 rooms and 1 bathroom',
                     ],
+                    'minimum_workers' => 2,
                 ]);
 
                 // Package 2: Standard Flat Layout
@@ -59,6 +60,7 @@ class PackageSeeder extends Seeder
                         'Deep wash of 3 rooms & 2 dedicated bathrooms',
                         'Kitchen outer cabinets grease wipe'
                     ],
+                    'minimum_workers' => 3,
                 ]);
 
                 // Package 3: Premium Multi-Story Building
@@ -79,6 +81,7 @@ class PackageSeeder extends Seeder
                         'Includes 5+ rooms, staircase sweeping, and balconies',
                         'Complete roof boundary clearing & external window wash tint'
                     ],
+                    'minimum_workers' => 2,
                 ]);
 
             } 
@@ -103,6 +106,7 @@ class PackageSeeder extends Seeder
                         'Standard 4-seat matching cabin vacuuming',
                         'Dashboard wipe down & tire gloss polish spray'
                     ],
+                    'minimum_workers' => 4,
                 ]);
 
                 // Package 2: Standard SUV Setup
@@ -123,6 +127,7 @@ class PackageSeeder extends Seeder
                         'Trunk storage debris extraction included',
                         'Mat washing & deep AC vent odor neutralizer application'
                     ],
+                    'minimum_workers' => 3,
                 ]);
 
                 // Package 3: Commercial Van or Luxury Elite Truck
@@ -143,6 +148,7 @@ class PackageSeeder extends Seeder
                         'Full leather treatment conditioning or heavy fabric steam scrubbing',
                         'Complete undercarriage mud jet blasting'
                     ],
+                    'minimum_workers' => 5,
                 ]);
             }
         }

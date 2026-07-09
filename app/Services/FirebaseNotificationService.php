@@ -15,7 +15,7 @@ class FirebaseNotificationService
     {
         $this->projectId = env('FCM_PROJECT_ID');
         // استخدام storage_path لضمان الوصول للملف بشكل صحيح
-        $this->credentialsPath = storage_path('app/firebase-credentials.json'); 
+        $this->credentialsPath = storage_path('app/firebase-credentials.json');
     }
 
     /**
@@ -27,7 +27,7 @@ class FirebaseNotificationService
         $client->setAuthConfig($this->credentialsPath);
         $client->addScope('https://www.googleapis.com/auth/firebase.messaging');
         $client->fetchAccessTokenWithAssertion();
-        
+
         return $client->getAccessToken()['access_token'];
     }
 
@@ -38,6 +38,7 @@ class FirebaseNotificationService
     {
         try {
             $accessToken = $this->getAccessToken();
+
             $url = "https://fcm.googleapis.com/v1/projects/{$this->projectId}/messages:send";
 
             $payload = [
@@ -47,14 +48,30 @@ class FirebaseNotificationService
                         'title' => $title,
                         'body' => $body,
                     ],
-                    // يمكنك تمرير بيانات إضافية تحتاجها في التطبيق (مثل id الطلب)
-                    'data' => array_map('strval', $data), 
-                ]
+
+                    'data' => array_map('strval', $data),
+
+                    'android' => [
+                        'priority' => 'HIGH',
+                        'notification' => [
+                            'channel_id' => 'high_importance_channel',
+                            'sound' => 'default',
+                        ],
+                    ],
+                ],
             ];
 
+            Log::info('FCM Payload', $payload);
+
             $response = Http::withToken($accessToken)
-                ->headers(['Content-Type' => 'application/json'])
                 ->post($url, $payload);
+
+            Log::info('FCM Response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->json(),
+                'raw' => $response->body(),
+            ]);
 
             return $response->successful();
 

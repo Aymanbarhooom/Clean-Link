@@ -91,10 +91,12 @@ class TaskController extends Controller
         'ar' => [
             'title' => 'تم الانتهاء من الطلب',
             'body' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
+            'status' => 'مكتملة',
         ],
         'en' => [
             'title' => 'Order Completed',
             'body' => "Your order #{$order->id} has been completed. Thank you for using our services.",
+            'status' => 'completed',
         ]
     ];
 
@@ -102,10 +104,12 @@ class TaskController extends Controller
         'ar' => [
             'title' => 'طلبك قيد المعالجة',
             'body' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
+            'status' => 'قيد المعالجة',
         ],
         'en' => [
             'title' => 'Order in Process',
             'body' => "Your order #{$order->id} is now in process. Thank you for using our services.",
+            'status' => 'in_process',
         ]
     ];
 
@@ -117,6 +121,18 @@ class TaskController extends Controller
             $worker->workerProfile->status = 'available';
             $worker->workerProfile->save();
         }
+        $client->notifications()->create([
+            'title_ar' => 'تم الانتهاء من الطلب',
+            'body_ar' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
+            'title_en' => 'Order Completed',
+            'body_en' => "Your order #{$order->id} has been completed. Thank you for using our services.",
+            'is_read' => false,
+            'data'=>[
+                'type'=> 'order_status_changed',
+                'order_id' => $order->id,
+                'status' => 'completed',
+            ]
+        ]);
 
         foreach ($client->fcmTokens as $token) {
             $notificationTitle = $doneNotifications[$token->lang]['title'] ?? $doneNotifications['en']['title'];
@@ -126,22 +142,30 @@ class TaskController extends Controller
                 $notificationTitle,
                 $notificationBody,
                 [
+                    'notification_id' => $client->notifications()->latest()->first()->id,
+                    'type'=> 'order_status_changed',
                     'order_id' => $order->id,
-                    'task_id' => $task->id,
+                    'status' => 'completed',
                 ]
             );
         }
 
-        $client->notifications()->create([
-            'title_ar' => 'تم الانتهاء من الطلب',
-            'body_ar' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
-            'title_en' => 'Order Completed',
-            'body_en' => "Your order #{$order->id} has been completed. Thank you for using our services.",
-            'is_read' => false,
-        ]);
     }
 
     if ($validated['status'] === 'handling') {
+        $client->notifications()->create([
+            'title_ar' => 'طلبك قيد المعالجة',
+            'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
+            'title_en' => 'Order in Process',
+            'body_en' => "Your order #{$order->id} is now in process. Thank you for using our services.",
+            'is_read' => false,
+            'data'=>[
+                'type'=> 'order_status_changed',
+                'order_id' => $order->id,
+                'status' => 'in_process',
+            ]
+        ]);
+
         $order->update(['status' => 'in_process']);
 
         foreach ($client->fcmTokens as $token) {
@@ -152,19 +176,14 @@ class TaskController extends Controller
                 $notificationTitle,
                 $notificationBody,
                 [
+                    'notification_id' => $client->notifications()->latest()->first()->id,
+                    'type'=> 'order_status_changed',
                     'order_id' => $order->id,
-                    'task_id' => $task->id,
+                    'status' => 'in_process',
                 ]
             );
         }
 
-        $client->notifications()->create([
-            'title_ar' => 'طلبك قيد المعالجة',
-            'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
-            'title_en' => 'Order in Process',
-            'body_en' => "Your order #{$order->id} is now in process. Thank you for using our services.",
-            'is_read' => false,
-        ]);
     }
 
     $task->load(['order.package.service', 'workgroup.leader']);
