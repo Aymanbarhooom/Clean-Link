@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Package extends Model
 {
-    protected $fillable = ['service_id', 'name_ar', 'name_en', 'duration', 'price','price_after_discount', 'details_ar', 'details_en'];
+    protected $fillable = ['service_id', 'name_ar', 'name_en', 'duration', 'price','price_after_discount', 'details_ar', 'details_en', 'minimum_workers'];
 
     /**
      * Automatic JSON casting conversion for array structures.
@@ -19,6 +19,7 @@ class Package extends Model
         'duration' => 'integer',
         'price' => 'float',
         'price_after_discount' => 'float',
+        'minimum_workers' => 'integer',
     ];
 
     public function service(): BelongsTo

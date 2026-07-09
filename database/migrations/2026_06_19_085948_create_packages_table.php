@@ -18,6 +18,7 @@ return new class extends Migration
             $table->decimal('price_after_discount',10, 2)->nullable()->comment('calculated price after applying any service-level discount');
             $table->json('details_ar'); // Holds an array/list of strings
             $table->json('details_en'); // Holds an array/list of strings
+            $table->integer('minimum_workers')->default(1);
             $table->timestamps();
         });
     }

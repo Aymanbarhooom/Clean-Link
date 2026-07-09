@@ -37,4 +37,14 @@ class NotificationController extends Controller
 
         return $this->successResponse(new NotificationResource($notification), 'Notification marked as read successfully');
     }
+
+    //unread notifications count
+    public function unreadCount(): JsonResponse
+    {
+        $unreadCount = auth()->user()
+            ->notifications()
+            ->where('is_read', false)
+            ->count();
+            
+        return $this->successResponse(['unread_count' => $unreadCount], 'Unread notifications count fetched successfully');}
 }

@@ -70,6 +70,7 @@ class PackageController extends Controller
             'details_ar.*' => 'required|string|max:500',
             'details_en' => 'nullable|array|min:1',
             'details_en.*' => 'required|string|max:500',
+            'minimum_workers' => 'required|integer|min:1',
         ]);
 
         $service = Service::find($validated['service_id']);
@@ -102,6 +103,7 @@ class PackageController extends Controller
             'details_ar.*' => 'required|string|max:500',
             'details_en' => 'sometimes|array|min:1',
             'details_en.*' => 'required|string|max:500',
+            'minimum_workers' => 'required|integer|min:1',
         ]);
         $service = $package->service;
         $package->update($validated);
