@@ -27,9 +27,9 @@ class DatabaseSeeder extends Seeder
             ServiceImageSeeder::class,
             ReviewSeeder::class,
             WorkerSeeder::class,
-            WorkGroupeSeeder::class,
-            OrderSeeder::class,
-            TaskSeeder::class,
+            //WorkGroupeSeeder::class,
+            //OrderSeeder::class,
+            //TaskSeeder::class,
         ]);
     }
 }
