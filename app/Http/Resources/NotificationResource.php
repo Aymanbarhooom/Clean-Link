@@ -21,6 +21,7 @@ class NotificationResource extends JsonResource
             'body' => $lang === 'en' ? $this->body_en : $this->body_ar,
             'is_read' => $this->is_read,
             'created_at' => $this->created_at,
+            'data' => $this->data,
         ];
     }
 }
