@@ -268,6 +268,7 @@ class OrderController extends Controller
 
                 if ($found) {
                     $leader = collect($found)->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)->first();
+                    $order->setRelation('leader', $leader);
 
                     $workgroup = Workgroup::create([
                         'company_id' => $company->id,
@@ -299,21 +300,18 @@ class OrderController extends Controller
                     ];
 
                     foreach ($found as $worker) {
-                        if ($worker && $worker->fcm_token) {
-                            $worker->notifications()->create([
-                                'title_ar' => 'تم تعيين مهمة جديدة',
-                                'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                                'title_en' => 'New Task Assigned',
-                                'body_en' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                                'data' => [
-                                    'type' => 'new_task_assigned',
-                                    'order_id' => $order->id,
-                                    'status' => 'assigned_to_worker',
-                                ],
-                            ]);
-                        }
-                    }
-                    foreach ($found as $worker) {
+                        $notification = $worker->notifications()->create([
+                            'title_ar' => 'تم تعيين مهمة جديدة',
+                            'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
+                            'title_en' => 'New Task Assigned',
+                            'body_en' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
+                            'data' => [
+                                'type' => 'new_task_assigned',
+                                'order_id' => $order->id,
+                                'status' => 'assigned_to_worker',
+                            ],
+                        ]);
+
                         foreach ($worker->fcmTokens as $token) {
                             $notificationTitle = $newTaskNotifications[$token->lang]['title'] ?? $newTaskNotifications['en']['title'];
                             $notificationBody = $newTaskNotifications[$token->lang]['body'] ?? $newTaskNotifications['en']['body'];
@@ -322,7 +320,7 @@ class OrderController extends Controller
                                 $notificationTitle,
                                 $notificationBody,
                                 [
-                                    'notification_id' => $worker->notifications()->latest()->first()->id,
+                                    'notification_id' => $notification->id,
                                     'type' => 'new_task_assigned',
                                     'order_id' => $order->id,
                                     'status' => 'assigned_to_worker',
@@ -399,10 +397,7 @@ class OrderController extends Controller
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
 
-    /**
-     * Generate combinations of $k items from $items array (array of objects)
-     * Returns array of arrays (each is a combination)
-     */
+   
     private function combinations(array $items, int $k): array
     {
         $results = [];
