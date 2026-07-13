@@ -30,6 +30,7 @@ class OrderResource extends JsonResource
 
             //relationships
             'client' => $this->whenLoaded('client'),
+            'leader' => $this->relationLoaded('leader') && $this->leader ? new UserResource($this->leader) : null,
             'package' => new PackageResource($this->package),
             'attributes' => AttributeResource::collection($this->whenLoaded('attributes')),
         ];
