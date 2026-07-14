@@ -15,7 +15,7 @@ class User extends Authenticatable
 
     protected $fillable = ['fullname', 'email', 'password', 'role'];
     protected $hidden = ['password', 'remember_token'];
-
+ 
     // --- Relationships ---
 
     public function profile(): HasOne
