@@ -93,8 +93,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::prefix('worker-profiles')->group(function () {
-        Route::get('/{worker}', [WorkerProfileController::class, 'show']);
         Route::get('/me', [WorkerProfileController::class, 'showOwn']);
+        Route::get('/{worker}', [WorkerProfileController::class, 'show']);
         Route::put('/', [WorkerProfileController::class, 'update']);
     });
 
@@ -164,7 +164,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
 // 🔔 صندوق وارد الإشعارات (In-App Notifications Inbox)
 // ==========================================
-Route::get('notifications', [NotificationController::class, 'index']);
-Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead']);
-Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead']);
+    Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
 });

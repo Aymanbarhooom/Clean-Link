@@ -34,8 +34,8 @@ class WorkerProfileController extends Controller
     public function showOwn(): JsonResponse
     {
         $worker = auth()->user();
-        $profile = $worker->workerProfile()->with('user.profile','skills')->first();
-        return $this->successResponse($profile, 'Your profile retrieved');
+        $worker->load(['profile', 'workerProfile.skills']);
+        return $this->successResponse($worker, 'Your profile retrieved');
     }
 
     /**

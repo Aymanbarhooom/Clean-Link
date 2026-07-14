@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class CategoryController extends Controller
 {
@@ -18,33 +19,34 @@ class CategoryController extends Controller
         $this->middleware('auth:sanctum')->except(['index', 'show']);
     }
 
+
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->integer('per_page', 10);
-        $perPage = max(1, min($perPage, 100));
-        $categories = Category::paginate($perPage);
-        $user = auth()->user();
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-         return $this->successResponse($categories, 'Categories matrix retrieved successfully');   
-        }
-        return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
+        $categories = Cache::remember('all_categories', now()->addDay(), function () {
+            return Category::all();
+        });
+
+        return $this->successResponse($categories, 'Categories matrix retrieved successfully');
     }
+
 
     public function show(Request $request, Category $category): JsonResponse
-    {
-        $perPage = $request->integer('per_page', 10);
-        $perPage = max(1, min($perPage, 100));
+{
+    $cacheKey = 'category_' . $category->id . '_with_services_images';
 
-        $services = $category->services()->paginate($perPage);
+    $cachedCategoryData = Cache::remember($cacheKey, now()->addDay(), function () use ($category) {
+        $category->load('services.images');
+        return $category;
+    });
 
-        $category->setRelation('services', $services);
-        $user = auth()->user();
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-         return $this->successResponse($category, 'Category specific parameters loaded');   
-        }
+    $user = auth()->user();
 
-        return $this->successResponse(new CategoryResource($category), 'Category specific parameters loaded');
+    if ($user && ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager())) {
+        return $this->successResponse($cachedCategoryData, 'Category specific parameters loaded');
     }
+
+    return $this->successResponse(new CategoryResource($cachedCategoryData), 'Category specific parameters loaded');
+}
 
 
     public function store(Request $request): JsonResponse
@@ -73,7 +75,7 @@ class CategoryController extends Controller
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
-      
+
         $validated = $request->validate([
             'name_ar' => 'sometimes|string|max:255',
             'name_en' => 'sometimes|string|max:255',
@@ -81,7 +83,7 @@ class CategoryController extends Controller
             'description_en' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
-          if ($request->hasFile('image')) {
+        if ($request->hasFile('image')) {
             $path = $request->file('image')->store('category_images', 'public');
             $validated['image'] = $path;
         }

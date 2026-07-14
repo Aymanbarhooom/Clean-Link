@@ -11,6 +11,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 class RegionController extends Controller
 {
@@ -104,36 +105,60 @@ class RegionController extends Controller
     }
 
     public function getRegions(): JsonResponse
-    {
-        $user = auth()->user();
-        
-        if ($user->isAdmin() || $user->role === 'client') {
-            $regions = Region::with('manager')->get();
-        } elseif ($user->role === 'region_manager') {
-            $regions = Region::where('manager_id', $user->id)->get();
-        } else {
-            return $this->errorResponse('Access mapping blocked', 403);
-        }
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-            return $this->successResponse($regions, 'Regions context retrieved');
-        }
-        return $this->successResponse(RegionResource::collection($regions), 'Regions context retrieved');
-    }
+{
+    $user = auth()->user();
 
-    public function showRegion(Region $region): JsonResponse
-    {
-        $user = auth()->user();
-        
-        if ($user->isAdmin() || $user->role === 'client' || ($user->role === 'region_manager' && $region->manager_id === $user->id)) {
-            $region->load('manager', 'companies');
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-            return $this->successResponse($region, 'Region details retrieved');
-        }
-            return $this->successResponse(new RegionResource($region), 'Region details retrieved');
-        }
-
+    // تبسيط شروط الوصول
+    if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
         return $this->errorResponse('Access mapping blocked', 403);
     }
+
+    $regions = collect(); 
+
+    if ($user->isAdmin() || $user->role === 'client') {
+        $cacheKey = 'all_regions_with_managers';
+        $regions = Cache::remember($cacheKey, now()->addDay(), function () {
+            return Region::with('manager')->get();
+        });
+    } elseif ($user->role === 'region_manager') {
+        $cacheKey = 'regions_for_manager_' . $user->id;
+        $regions = Cache::remember($cacheKey, now()->addDay(), function () use ($user) {
+         
+            return Region::where('manager_id', $user->id)->get();
+        });
+    }
+
+    if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+        return $this->successResponse($regions, 'Regions context retrieved');
+    }
+
+    return $this->successResponse(RegionResource::collection($regions), 'Regions context retrieved');
+}
+
+    public function showRegion(Region $region): JsonResponse
+{
+    $user = auth()->user();
+
+    $hasAccess = $user->isAdmin() || $user->role === 'client' || ($user->role === 'region_manager' && $region->manager_id === $user->id);
+
+    if (!$hasAccess) {
+        return $this->errorResponse('Access mapping blocked', 403);
+    }
+
+    $cacheKey = 'region_' . $region->id . '_details_with_manager_companies';
+
+    $cachedRegion = Cache::remember($cacheKey, now()->addDay(), function () use ($region) {
+
+        $region->load('manager', 'companies');
+        return $region;
+    });
+
+    if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
+        return $this->successResponse($cachedRegion, 'Region details retrieved');
+    }
+
+    return $this->successResponse(new RegionResource($cachedRegion), 'Region details retrieved');
+}
 
     public function deleteRegion(Region $region): JsonResponse
     {
