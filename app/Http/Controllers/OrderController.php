@@ -363,7 +363,7 @@ class OrderController extends Controller
 
         $user = auth()->user();
 
-        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup']);
+        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader']);
 
         if ($user->isAdmin()) {
             // admin sees everything
@@ -381,18 +381,17 @@ class OrderController extends Controller
             });
         } else {
             $query->where('client_id', $user->id);
-            $query->orderBy('created_at', 'desc');
-            return $this->successResponse(OrderResource::collection($query->get()), 'Orders index fetched successfully');
         }
 
-        return $this->successResponse($query->orderBy('created_at', 'desc')->get(), 'Orders index fetched successfully');
+        $orders = $query->orderBy('created_at', 'desc')->get();
+        return $this->successResponse(OrderResource::collection($orders), 'Orders index fetched successfully');
     }
 
     public function show(Order $order): JsonResponse
     {
         $this->authorize('view', $order);
 
-        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
+        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile', 'tasks.workgroup.leader']);
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }

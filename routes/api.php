@@ -92,15 +92,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [ProfileController::class, 'update']);
     });
 
+    Route::post('worker/update-skills', [WorkerProfileController::class, 'attachSkills']);
+
     Route::prefix('worker-profiles')->group(function () {
         Route::get('/me', [WorkerProfileController::class, 'showOwn']);
         Route::get('/{worker}', [WorkerProfileController::class, 'show']);
         Route::put('/', [WorkerProfileController::class, 'update']);
+        Route::post('/evaluateWorker', [WorkerProfileController::class, 'evaluateWorker']);
+
     });
 
     Route::prefix('attributes')->group(function () {
         Route::get('/', [AttributeController::class, 'index']);      // Accessible to Admin & Company Managers
-        Route::post('/', [AttributeController::class, 'store']);     // Admin only
+        Route::put('/', [AttributeController::class, 'store']);     // Admin only
         Route::delete('/{attribute}', [AttributeController::class, 'destroy']); // Admin only
     });
 

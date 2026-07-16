@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
 
 class WorkerProfileController extends Controller
 {
@@ -27,7 +28,7 @@ class WorkerProfileController extends Controller
         if (!$worker->isWorker()) {
             return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
         }
-        $profile = $worker->workerProfile()->with('user.profile','skills')->first();
+        $profile = $worker->workerProfile()->with('user.profile', 'skills')->first();
         return $this->successResponse($profile, 'Worker extension record structure retrieved');
     }
 
@@ -36,6 +37,23 @@ class WorkerProfileController extends Controller
         $worker = auth()->user();
         $worker->load(['profile', 'workerProfile.skills']);
         return $this->successResponse($worker, 'Your profile retrieved');
+    }
+
+    public function evaluateWorker(Request $request): JsonResponse
+    {
+        $manager = auth()->user();
+        $validated = $manager->validate([
+            'worker_id' => 'required|integer|exists:users,id',
+            'rating' => 'nullable|numeric|min:0|max:5',
+        ]);
+        $worker = User::find($validated['worker_id']);
+        $company = $manager->company;
+        if (!$worker || $company->manager->id !== $manager->id) {
+            return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
+        }
+        $profile = $worker->workerProfile()->with('user.profile', 'skills')->first();
+        $profile->rating = $validated['rating'] ?? $profile->rating;
+        return $this->successResponse($profile, 'Worker extension record structure retrieved');
     }
 
     /**
@@ -49,14 +67,67 @@ class WorkerProfileController extends Controller
         }
 
         $validated = $request->validate([
-            'experience_years' => 'required|integer|min:0',
-            'status'=>'required|string|in:active,inactive',
+            'fullname' => 'nullable|string|max:255',
+            'email' => 'nullable|string|email|max:255|unique:users,email,' . $worker->id,
+            'phone' => 'nullable|string|max:20|unique:users,phone,' . $worker->id,
+            'address' => 'nullable|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
+            'experience_years' => 'nullable|integer|min:0',
+            'status' => 'nullable|string|in:available,off',
         ]);
 
-        $worker->workerProfile()->update([
-            'experience_years' => $validated['experience_years'],
-            'status' => $validated['status'],
-        ]);
+        // 1. Prepare User Data (Only what exists in request)
+        $userData = [];
+        if ($request->has('fullname')) {
+            $userData['fullname'] = $validated['fullname'];
+        }
+        if ($request->has('email')) {
+            $userData['email'] = $validated['email'];
+        }
+
+        // 2. Prepare Profile Data
+        $profileData = [];
+        if ($request->has('phone')) {
+            $profileData['phone'] = $validated['phone'];
+        }
+        if ($request->has('address')) {
+            $profileData['address'] = $validated['address'];
+        }
+
+        // Handle Profile Image Upload / Reset
+        if ($request->hasFile('image')) {
+            // Delete old image if it exists
+            if ($worker->profile && $worker->profile->image) {
+                Storage::disk('public')->delete($worker->profile->image);
+            }
+            $profileData['image'] = $request->file('image')->store('worker_images', 'public');
+        } elseif ($request->has('image') && is_null($request->input('image'))) {
+            // If user explicitly sent "image": null to delete their picture
+            if ($worker->profile && $worker->profile->image) {
+                Storage::disk('public')->delete($worker->profile->image);
+            }
+            $profileData['image'] = null;
+        }
+
+        // 3. Prepare Worker Profile Data
+        $workerProfileData = [];
+        if ($request->has('experience_years')) {
+            $workerProfileData['experience_years'] = $validated['experience_years'];
+        }
+        if ($request->has('status')) {
+            $workerProfileData['status'] = $validated['status'];
+        }
+
+        // 4. Perform Updates conditionally
+        if (!empty($userData)) {
+            $worker->update($userData);
+        }
+        if (!empty($profileData)) {
+            $worker->profile()->update($profileData);
+        }
+        if (!empty($workerProfileData)) {
+            $worker->workerProfile()->update($workerProfileData);
+        }
 
         return $this->successResponse(
             $worker->load(['profile', 'workerProfile']),
@@ -64,7 +135,8 @@ class WorkerProfileController extends Controller
         );
     }
 
-        /**
+
+    /**
      * Attach multiple operational skills to a specific field worker.
      * Route: POST /api/workers/{worker}/skills
      */
@@ -75,9 +147,6 @@ class WorkerProfileController extends Controller
             return $this->errorResponse('Target profile identity is not a registered worker', 422);
         }
 
-        // Verify that the logged-in Company Manager manages this specific worker
-        $this->authorize('update', $worker);
-
         $validated = $request->validate([
             'skill_ids' => 'required|array|min:1',
             'skill_ids.*' => 'required|integer|exists:skills,id',
@@ -87,7 +156,7 @@ class WorkerProfileController extends Controller
         $worker->workerProfile->skills()->syncWithoutDetaching($validated['skill_ids']);
 
         return $this->successResponse(
-            $worker->load(['workerProfile.skills', 'profile']), 
+            $worker->load(['workerProfile.skills', 'profile']),
             'Skills assigned to the worker profile successfully'
         );
     }

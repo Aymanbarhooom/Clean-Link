@@ -12,7 +12,6 @@ class ServiceObserver
     {
         Cache::forget('homepage_offers');
         Cache::forget('homepage_top_services');
-        $this->clearHomepageServiceCaches();
     }
     /**
      * Handle the Service "created" event.
