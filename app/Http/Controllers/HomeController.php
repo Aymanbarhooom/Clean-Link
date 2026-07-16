@@ -56,7 +56,7 @@ class HomeController extends Controller
                 ->take(6)
                 ->get();
         });
-
+        $topCompanies->load('workTimes');
         // Aggregate inside a structured layout matching your frontend requirement
         return $this->successResponse([
             'offers' => ServiceResource::collection($offers),
@@ -112,6 +112,7 @@ class HomeController extends Controller
             }
         }
         $companies = $companiesQuery->get();
+        $companies->load('workTimes');
 
         // 4. Search in Services (Filtered by Region & Rating)
         $servicesQuery = Service::query()
