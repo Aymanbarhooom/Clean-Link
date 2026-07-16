@@ -30,9 +30,26 @@ class OrderResource extends JsonResource
 
             //relationships
             'client' => $this->whenLoaded('client'),
-            'leader' => $this->relationLoaded('leader') && $this->leader ? new UserResource($this->leader) : null,
+            'leader' => $this->getLeaderResource(),
             'package' => new PackageResource($this->package),
             'attributes' => AttributeResource::collection($this->whenLoaded('attributes')),
         ];
+    }
+
+    private function getLeaderResource(): ?UserResource
+    {
+        if ($this->relationLoaded('leader') && $this->leader) {
+            return new UserResource($this->leader);
+        }
+
+        if ($this->relationLoaded('tasks')) {
+            $task = $this->tasks->first();
+            $leader = $task?->workgroup?->leader;
+            if ($leader) {
+                return new UserResource($leader);
+            }
+        }
+
+        return null;
     }
 }
