@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Review;
 use App\Models\Company;
 use App\Models\Service;
@@ -64,6 +65,29 @@ class ReviewController extends Controller
 
         if (!$reviewableEntity) {
             return $this->errorResponse('Target review entity not found', 404);
+        }
+
+        $user = auth()->user();
+        $hasUsedReviewable = false;
+
+        if ($validated['type'] === 'company') {
+            $hasUsedReviewable = Order::where('client_id', $user->id)
+                ->whereHas('package.service', function ($query) use ($reviewableEntity) {
+                    $query->where('company_id', $reviewableEntity->id);
+                })
+                ->whereIn('status', ['assigned_to_worker', 'in_process', 'completed'])
+                ->exists();
+        } else {
+            $hasUsedReviewable = Order::where('client_id', $user->id)
+                ->whereHas('package.service', function ($query) use ($reviewableEntity) {
+                    $query->where('id', $reviewableEntity->id);
+                })
+                ->whereIn('status', ['assigned_to_worker', 'in_process', 'completed'])
+                ->exists();
+        }
+
+        if (!$hasUsedReviewable) {
+            return $this->errorResponse('Only clients who used this can review!', 403);
         }
 
         // Create the polymorphic review mapping

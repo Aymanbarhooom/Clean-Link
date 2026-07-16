@@ -363,7 +363,7 @@ class OrderController extends Controller
 
         $user = auth()->user();
 
-        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader']);
+        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
         if ($user->isAdmin()) {
             // admin sees everything
@@ -391,7 +391,7 @@ class OrderController extends Controller
     {
         $this->authorize('view', $order);
 
-        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile', 'tasks.workgroup.leader']);
+        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile', 'tasks.workgroup.leader.profile']);
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
