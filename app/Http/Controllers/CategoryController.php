@@ -26,7 +26,7 @@ class CategoryController extends Controller
             return Category::all();
         });
 
-        return $this->successResponse($categories, 'Categories matrix retrieved successfully');
+        return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
     }
 
 

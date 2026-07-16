@@ -151,7 +151,8 @@ class CompanyController extends Controller
 
         // High-density optimization using relational nested Eager Loading syntax matching clean data schemas 
         $query = Company::with([
-            'region.manager'
+            'region.manager',
+            'workTimes'
         ]);
 
         if ($user->role === 'region_manager') {

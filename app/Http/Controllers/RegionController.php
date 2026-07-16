@@ -149,7 +149,7 @@ class RegionController extends Controller
 
     $cachedRegion = Cache::remember($cacheKey, now()->addDay(), function () use ($region) {
 
-        $region->load('manager', 'companies');
+        $region->load('manager', 'companies.workTimes');
         return $region;
     });
 
