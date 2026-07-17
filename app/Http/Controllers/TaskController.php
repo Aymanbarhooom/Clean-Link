@@ -33,7 +33,7 @@ class TaskController extends Controller
         $tasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })
-            ->with(['order.package.service', 'workgroup.leader'])
+            ->with(['order.package.service', 'order.client', 'workgroup.leader'])
             ->orderBy('created_at', 'desc')
             ->get();
 
