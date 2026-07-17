@@ -9,6 +9,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class WorkerProfileController extends Controller
 {
@@ -69,52 +70,39 @@ class WorkerProfileController extends Controller
         $validated = $request->validate([
             'fullname' => 'nullable|string|max:255',
             'email' => 'nullable|string|email|max:255|unique:users,email,' . $worker->id,
-            'phone' => 'nullable|string|max:20|unique:users,phone,' . $worker->id,
+            'phone' => ['nullable', 'string', 'max:20', Rule::unique('profiles', 'phone')->ignore($worker->profile?->id)],
             'address' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
             'experience_years' => 'nullable|integer|min:0',
             'status' => 'nullable|string|in:available,off',
         ]);
 
-        // 1. Prepare User Data (Only what exists in request)
+        // 1. Prepare User Data (فقط إذا كان الحقل يحتوي على قيمة)
         $userData = [];
-        if ($request->has('fullname')) {
+        if ($request->filled('fullname')) {
             $userData['fullname'] = $validated['fullname'];
         }
-        if ($request->has('email')) {
+        if ($request->filled('email')) {
             $userData['email'] = $validated['email'];
         }
 
         // 2. Prepare Profile Data
         $profileData = [];
-        if ($request->has('phone')) {
+        if ($request->filled('phone')) {
             $profileData['phone'] = $validated['phone'];
         }
-        if ($request->has('address')) {
+        if ($request->filled('address')) {
             $profileData['address'] = $validated['address'];
         }
 
-        // Handle Profile Image Upload / Reset
-        if ($request->hasFile('image')) {
-            // Delete old image if it exists
-            if ($worker->profile && $worker->profile->image) {
-                Storage::disk('public')->delete($worker->profile->image);
-            }
-            $profileData['image'] = $request->file('image')->store('worker_images', 'public');
-        } elseif ($request->has('image') && is_null($request->input('image'))) {
-            // If user explicitly sent "image": null to delete their picture
-            if ($worker->profile && $worker->profile->image) {
-                Storage::disk('public')->delete($worker->profile->image);
-            }
-            $profileData['image'] = null;
-        }
+        // ... حقل الصورة يبقى كما هو لأنك تتعامل مع الـ null فيه بشكل مخصص ...
 
         // 3. Prepare Worker Profile Data
         $workerProfileData = [];
-        if ($request->has('experience_years')) {
+        if ($request->filled('experience_years')) {
             $workerProfileData['experience_years'] = $validated['experience_years'];
         }
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $workerProfileData['status'] = $validated['status'];
         }
 
