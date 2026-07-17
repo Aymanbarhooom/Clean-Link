@@ -15,7 +15,7 @@ class SkillController extends Controller
    
     public function index(): JsonResponse
     {
-        $skills = Skill::orderBy('name_en', 'asc')->get();
+        $skills = Skill::orderBy('id', 'asc')->get();
         return $this->successResponse($skills, 'Skills dictionary fetched successfully');
     }
 
