@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>رمز التحقق</title>
+    <title>OTP Code</title>
 </head>
 <body>
     <h2>Hello {{ $fullname }}!</h2>
