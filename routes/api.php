@@ -41,6 +41,7 @@ Route::prefix('auth')->group(function () {
         Route::post('/fcm-token', [AuthController::class, 'updateFcmToken']);
         Route::post('/update', [AuthController::class, 'updateProfile']);
         Route::put('/change-password', [AuthController::class, 'changePassword']);
+        Route::delete('/delete-account', [AuthController::class, 'deleteAccount']);
     });
 });
 
@@ -120,6 +121,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/home-page', [HomeController::class, 'index']);
     Route::get('/search', [HomeController::class, 'search']);
     Route::get('/offers', [HomeController::class, 'getoffers']);
+    Route::get('/dashboard-summary', [HomeController::class, 'userSummary']);
+    Route::get('/my-reviews', [HomeController::class, 'userReviews']);
 
     Route::get('skills', [SkillController::class, 'index']);
     Route::post('skills', [SkillController::class, 'store']);

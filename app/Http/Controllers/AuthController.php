@@ -253,4 +253,32 @@ class AuthController extends Controller
 
         return $this->successResponse([], 'Password changed successfully');
     }
+
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'client') {
+            return response()->json(['message' => 'This function is only available for client accounts.'], 403);
+        }
+
+        try {
+            $user->workgroups()->detach();
+            $user->orders()->delete();
+            $user->favorites()->delete();
+            $user->fcmTokens()->delete();
+            $user->notifications()->delete();
+
+            if ($user->profile) {
+                $user->profile()->delete();
+            }
+            $user->delete();
+
+            return response()->json(['message' => 'Your client account and all associated data have been successfully deleted.'], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Error deleting client account: ' . $e->getMessage(), ['user_id' => $user->id]);
+            return response()->json(['message' => 'An error occurred while trying to delete your account. Please try again later.'], 500);
+        }
+    }
 }
