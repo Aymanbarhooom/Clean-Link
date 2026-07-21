@@ -10,6 +10,7 @@ use App\Http\Resources\ServiceResource;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Region;
+use App\Models\Review;
 use App\Models\Service;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -20,10 +21,6 @@ class HomeController extends Controller
 {
     use ApiResponse;
 
-    /**
-     * Aggregated Home Page Data for Mobile App Client
-     * Route: GET /api/home-page
-     */
     public function index(): JsonResponse
     {
         // 1. Offers: Services sorted by the largest absolute discount amount
@@ -167,5 +164,32 @@ class HomeController extends Controller
             ->orderBy('discount', 'desc')
             ->get();
         return $this->successResponse(ServiceResource::collection($offers), "Offers retrieved successfully");
+    }
+
+    public function userSummary(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $data = [
+            'total_bookings' => $user->orders()->count(),
+            'total_favorites' => $user->favorites()->count(),
+            'total_reviews' => Review::where('client_id', $user->id)->count(),
+        ];
+
+        return $this->successResponse($data, 'User summary counts loaded successfully');
+    }
+
+    public function userReviews(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $reviews = Review::where('client_id', $user->id)
+            ->with('reviewable')
+            ->get();
+
+        return $this->successResponse([
+            'companies' => $reviews->where('reviewable_type', Company::class)->values()->toArray(),
+            'services' => $reviews->where('reviewable_type', Service::class)->values()->toArray(),
+        ], 'User reviews split by companies and services');
     }
 }
