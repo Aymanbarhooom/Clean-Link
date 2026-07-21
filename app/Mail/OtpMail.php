@@ -21,7 +21,7 @@ class OtpMail extends Mailable
 
     public function build()
     {
-        return $this->subject('رمز التحقق من التسجيل')
+        return $this->subject('ٌRegistration One Time Password')
                     ->view('emails.otp');
     }
 }
