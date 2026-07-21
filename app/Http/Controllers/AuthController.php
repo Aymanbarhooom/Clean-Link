@@ -274,11 +274,11 @@ class AuthController extends Controller
             }
             $user->delete();
 
-            return response()->json(['message' => 'Your client account and all associated data have been successfully deleted.'], 200);
+            return $this->successResponse([], 'Your account has been deleted successfully.',200);
 
         } catch (\Exception $e) {
             \Log::error('Error deleting client account: ' . $e->getMessage(), ['user_id' => $user->id]);
-            return response()->json(['message' => 'An error occurred while trying to delete your account. Please try again later.'], 500);
+            return $this->errorResponse('An error occurred while trying to delete your account. Please try again later.', 500);
         }
     }
 }
