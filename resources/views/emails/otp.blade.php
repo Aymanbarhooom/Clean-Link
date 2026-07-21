@@ -5,10 +5,10 @@
     <title>رمز التحقق</title>
 </head>
 <body>
-    <h2>مرحباً {{ $fullname }}</h2>
-    <p>رمز التحقق الخاص بك هو:</p>
-    <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px;">{{ $otpCode }}</h1>
-    <p>هذا الرمز صالح لمدة 10 دقائق فقط</p>
-    <p>إذا لم تطلب هذا الرمز، يرجى تجاهل هذه الرسالة</p>
+    <h2>Hello {{ $fullname }}!</h2>
+    <p>Your verification code is:</p>
+    <h1 style="color: #1b9da1; font-size: 32px; letter-spacing: 5px;">{{ $otpCode }}</h1>
+    <p>This code is valid for 10 minutes only</p>
+    <p>If you did not request this code, please ignore this message</p>
 </body>
 </html>
