@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Mail\OtpMail;
+use App\Models\EmailVerification;
 use App\Models\FcmToken;
 use App\Models\User;
 use App\Traits\ApiResponse;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -28,44 +32,125 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
+        // توليد كود OTP بسيط (مثلاً 6 أرقام)
+        $otpCode = rand(100000, 999999);
+
+        // حفظ الـ OTP في الجدول
+        EmailVerification::create([
+            'email' => $validated['email'],
+            'otp_code' => $otpCode,
+            'expires_at' => Carbon::now()->addMinutes(10),
+        ]);
+
+        // إرسال الإيميل
+        Mail::to($validated['email'])->send(new OtpMail($otpCode, $validated['fullname']));
+
+        return $this->successResponse([
+            'email' => $validated['email'],
+        ], 'OTP sent to email. Please verify to complete registration.', 210);
+    }
+
+    public function verifyOtp(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'fullname' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255',
+            'password' => 'required|string|min:8',
+            'otp_code' => 'required|digits:6',
+        ]);
+
+        // البحث عن سجل الـ OTP
+        $verification = EmailVerification::where('email', $validated['email'])
+            ->where('otp_code', $validated['otp_code'])
+            ->where('is_used', false)
+            ->first();
+
+        if (! $verification) {
+            return $this->errorResponse('Invalid OTP code', 400);
+        }
+
+        // التحقق من انتهاء الصلاحية
+        if ($verification->expires_at->isPast()) {
+            return $this->errorResponse('OTP code has expired', 400);
+        }
+
+        // تعليم الـ OTP أنه تم استخدامه
+        $verification->update(['is_used' => true]);
+
+        // إنشاء المستخدم فعلياً
         $user = User::create([
             'fullname' => $validated['fullname'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => 'client', // Registration is strictly restricted to clients
+            'role' => 'client',
         ]);
 
-        $user->profile()->create(); // Initialize blank profile record
+        $user->profile()->create();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return $this->successResponse([
             'user' => $user,
             'access_token' => $token,
-        ], 'Client registered successfully', 211);
+        ], 'Client registered and verified successfully', 211);
     }
 
-    public function login(Request $request): JsonResponse
+    public function resendOtp(Request $request): JsonResponse
 {
-    // 1. التحقق من البيانات المدخلة
     $validated = $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
+        'fullname' => 'required|string|max:255',
+        'email' => 'required|string|email|max:255',
     ]);
 
-    $user = User::where('email', $validated['email'])->first();
-
-    if (!$user || !Hash::check($validated['password'], $user->password)) {
-        return $this->errorResponse('Invalid operational login credentials', 401);
+    // تأكد أن الإيميل غير موجود في جدول users (يعني لم يُسجّل بعد)
+    if (\App\Models\User::where('email', $validated['email'])->exists()) {
+        return $this->errorResponse('This email is already registered', 400);
     }
 
-    $token = $user->createToken('auth_token')->plainTextToken;
+    // احذف أي OTP قديم غير مستخدم
+    EmailVerification::where('email', $validated['email'])
+        ->where('is_used', false)
+        ->delete();
+
+    // توليد كود جديد
+    $otpCode = rand(100000, 999999);
+
+    // إنشاء سجل جديد
+    EmailVerification::create([
+        'email' => $validated['email'],
+        'otp_code' => $otpCode,
+        'expires_at' => Carbon::now()->addMinutes(10),
+    ]);
+
+    // إرسال الإيميل
+    Mail::to($validated['email'])->send(new OtpMail($otpCode, $validated['fullname']));
 
     return $this->successResponse([
-        'user' => $user->load('profile'),
-        'access_token' => $token,
-    ], 'Logged in successfully');
+        'email' => $validated['email'],
+    ], 'A new OTP has been sent to your email', 210);
 }
+
+    public function login(Request $request): JsonResponse
+    {
+        // 1. التحقق من البيانات المدخلة
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
+            return $this->errorResponse('Invalid operational login credentials', 401);
+        }
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return $this->successResponse([
+            'user' => $user->load('profile'),
+            'access_token' => $token,
+        ], 'Logged in successfully');
+    }
 
 
     public function logout(Request $request): JsonResponse
@@ -84,26 +169,26 @@ class AuthController extends Controller
      * Route endpoint: POST /api/auth/fcm-token
      */
     public function updateFcmToken(Request $request): JsonResponse
-{
-    $validated = $request->validate([
-        'fcm_token'   => 'required|string',
-        'device_type' => 'nullable|string|in:android,ios,web',
-        'lang'        => 'nullable|string|size:2', 
-    ]);
+    {
+        $validated = $request->validate([
+            'fcm_token'   => 'required|string',
+            'device_type' => 'nullable|string|in:android,ios,web',
+            'lang'        => 'nullable|string|size:2',
+        ]);
 
-    $deviceLang = $validated['lang'] ?? app()->getLocale();
+        $deviceLang = $validated['lang'] ?? app()->getLocale();
 
-    $tokenRecord = FcmToken::updateOrCreate(
-        ['token' => $validated['fcm_token']],
-        [
-            'user_id'     => auth()->id(),
-            'device_type' => $validated['device_type'] ?? null,
-            'lang'        => $deviceLang
-        ]
-    );
+        $tokenRecord = FcmToken::updateOrCreate(
+            ['token' => $validated['fcm_token']],
+            [
+                'user_id'     => auth()->id(),
+                'device_type' => $validated['device_type'] ?? null,
+                'lang'        => $deviceLang
+            ]
+        );
 
-    return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
-}
+        return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
+    }
 
     /**
      * Update Account Profile Information (User + Profile Models)
@@ -120,7 +205,7 @@ class AuthController extends Controller
             'address' => 'nullable|string|max:500',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
-        if($request->hasFile('image')) {
+        if ($request->hasFile('image')) {
             $path = $request->file('image')->store('profile_images', 'public');
             $validated['image'] = $path;
         }
@@ -139,7 +224,7 @@ class AuthController extends Controller
         ]);
 
         return $this->successResponse(
-            $user->load('profile'), 
+            $user->load('profile'),
             'Account information updated successfully'
         );
     }
@@ -168,6 +253,4 @@ class AuthController extends Controller
 
         return $this->successResponse([], 'Password changed successfully');
     }
-
-
 }
