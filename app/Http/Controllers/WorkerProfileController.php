@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class WorkerProfileController extends Controller
@@ -94,8 +93,9 @@ class WorkerProfileController extends Controller
         if ($request->filled('address')) {
             $profileData['address'] = $validated['address'];
         }
-
-        // ... حقل الصورة يبقى كما هو لأنك تتعامل مع الـ null فيه بشكل مخصص ...
+        if ($request->hasFile('image')) {
+            $profileData['image'] = $request->file('image')->store('worker_profiles', 'public');
+        }
 
         // 3. Prepare Worker Profile Data
         $workerProfileData = [];
@@ -111,7 +111,11 @@ class WorkerProfileController extends Controller
             $worker->update($userData);
         }
         if (!empty($profileData)) {
-            $worker->profile()->update($profileData);
+            $profile = $worker->profile;
+            if (!$profile) {
+                $profile = $worker->profile()->create([]);
+            }
+            $profile->update($profileData);
         }
         if (!empty($workerProfileData)) {
             $worker->workerProfile()->update($workerProfileData);
