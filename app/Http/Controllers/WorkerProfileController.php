@@ -40,21 +40,41 @@ class WorkerProfileController extends Controller
     }
 
     public function evaluateWorker(Request $request): JsonResponse
-    {
-        $manager = auth()->user();
-        $validated = $manager->validate([
-            'worker_id' => 'required|integer|exists:users,id',
-            'rating' => 'nullable|numeric|min:0|max:5',
-        ]);
-        $worker = User::find($validated['worker_id']);
-        $company = $manager->company;
-        if (!$worker || $company->manager->id !== $manager->id) {
-            return $this->errorResponse('Operational user profile mapping identity is not a worker', 422);
-        }
-        $profile = $worker->workerProfile()->with('user.profile', 'skills')->first();
-        $profile->rating = $validated['rating'] ?? $profile->rating;
-        return $this->successResponse($profile, 'Worker extension record structure retrieved');
+{
+    // 1. Correct validation syntax
+    $validated = $request->validate([
+        'worker_id' => 'required|integer|exists:users,id',
+        'rating'    => 'nullable|numeric|min:0|max:5',
+    ]);
+
+    $manager = auth()->user();
+    
+    // 2. Get all IDs of companies managed by this user
+    $managedCompanyIds = $manager->managedCompanies()->pluck('id')->toArray();
+
+    if (empty($managedCompanyIds)) {
+        return $this->errorResponse('You do not manage any companies', 403);
     }
+
+    // 3. Find the profile and ensure it belongs to one of the manager's companies
+    $profile = WorkerProfile::where('user_id', $validated['worker_id'])
+        ->whereIn('company_id', $managedCompanyIds) // Restricts search to authorized companies
+        ->with(['user.profile', 'skills', 'user.workgroups']) // Prevents N+1 database performance hits
+        ->first();
+
+    // 4. Secure check: Fail if worker doesn't exist or belongs to another company
+    if (!$profile) {
+        return $this->errorResponse('Worker profile not found within your managed companies', 422);
+    }
+
+    // 5. Explicitly update and save the database record
+    if (array_key_exists('rating', $validated)) {
+        $profile->rating = $validated['rating'];
+        $profile->save();
+    }
+
+    return $this->successResponse($profile, 'Worker evaluation updated successfully');
+}
 
     /**
      * Modify targeted structural experience attributes.
@@ -152,5 +172,4 @@ class WorkerProfileController extends Controller
             'Skills assigned to the worker profile successfully'
         );
     }
-
 }
