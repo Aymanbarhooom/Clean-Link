@@ -35,4 +35,15 @@ class SkillController extends Controller
 
         return $this->successResponse($skill, 'New skill defined inside system core registry', 211);
     }
+
+    public function destroy(Skill $skill): JsonResponse
+    {
+        if (!auth()->user()->isAdmin()) {
+            return $this->errorResponse('Access restricted to administrative accounts only', 403);
+        }
+
+        $skill->delete();
+
+        return $this->successResponse([], 'Skill removed from the system dictionary');
+    }
 }

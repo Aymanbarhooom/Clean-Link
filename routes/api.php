@@ -126,6 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('skills', [SkillController::class, 'index']);
     Route::post('skills', [SkillController::class, 'store']);
+    Route::delete('skills/{skill}', [SkillController::class, 'destroy']);
 
     // ==========================================
     // 🎓 Dynamic Skill Assignment Mapping Routes
