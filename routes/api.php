@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
@@ -89,6 +90,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('categories', CategoryController::class);
 
+    Route::prefix('admin/search')->group(function () {
+        Route::get('/region-managers', [AdminController::class, 'searchRegionManagers']);
+        Route::get('/regions', [AdminController::class, 'searchRegions']);
+        Route::get('/skills', [AdminController::class, 'searchSkills']);
+        Route::get('/attributes', [AdminController::class, 'searchAttributes']);
+        Route::get('/categories', [AdminController::class, 'searchCategories']);
+        Route::get('/companies', [AdminController::class, 'searchCompanies']);
+        Route::get('/services', [AdminController::class, 'searchServices']);
+    });
 
     Route::prefix('profile')->group(function () {
         Route::get('/', [ProfileController::class, 'show']);
@@ -158,7 +168,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     Route::get('orders', [OrderController::class, 'index']);
     Route::get('orders/{order}', [OrderController::class, 'show']);
-    Route::post('orders/{order}/assign', [OrderController::class, 'assignToWorkgroup']); // الإسناد لورشة
 
     // ==========================================
     // 👷 مسارات مهام العمال والورشات (Tasks Workflows)
