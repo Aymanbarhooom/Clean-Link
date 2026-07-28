@@ -21,13 +21,24 @@ class CategoryController extends Controller
 
 
     public function index(Request $request): JsonResponse
-    {
-        $categories = Cache::remember('all_categories', now()->addDay(), function () {
-            return Category::all();
-        });
+{
+    $cursor = $request->get('cursor', 'default');
 
-        return $this->successResponse(CategoryResource::collection($categories), 'Categories matrix retrieved successfully');
-    }
+    $categories = Category::orderBy('id', 'asc')->cursorPaginate(2);
+    
+
+    $responseData = [
+        'items' => CategoryResource::collection($categories->items()), // تحويل الـ 10 عناصر الحالية فقط عبر الـ Resource
+        'pagination' => [
+            'next_cursor' => $categories->nextCursor()?->encode(),
+            'prev_cursor' => $categories->previousCursor()?->encode(),
+            'has_more'    => $categories->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Categories matrix retrieved successfully');
+}
+
 
 
     public function show(Request $request, Category $category): JsonResponse
