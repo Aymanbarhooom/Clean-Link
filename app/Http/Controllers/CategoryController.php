@@ -24,7 +24,7 @@ class CategoryController extends Controller
 {
     $cursor = $request->get('cursor', 'default');
 
-    $categories = Category::orderBy('id', 'asc')->cursorPaginate(2);
+    $categories = Category::orderBy('id', 'asc')->cursorPaginate(6);
     
 
     $responseData = [
