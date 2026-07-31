@@ -158,8 +158,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/toggle', [FavoriteController::class, 'toggleFavorite']);
     });
 
-    Route::post('/service-images', [ServiceImageController::class, 'store']);
-    Route::post('/work-times', [WorkTimesController::class, 'insertOrUpdate']);
+    Route::post('service-images', [ServiceImageController::class, 'store']);
+    Route::post('work-times', [WorkTimesController::class, 'insertOrUpdate']);
 
     // ==========================================
     // 👥 Operational Crews & Workgroups Management

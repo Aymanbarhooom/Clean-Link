@@ -7,9 +7,11 @@ use App\Models\Service;
 use App\Models\ServiceImage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Traits\ApiResponse;
 
 class ServiceImageController extends Controller
 {
+    use ApiResponse;
     public function store(Request $request): JsonResponse
     {
         $request->validate([
@@ -20,7 +22,7 @@ class ServiceImageController extends Controller
         $user = auth()->user();
         $service = Service::find($request->service_id);
         $company = $service->company;
-        if(!$user->isCompanyManager() && $company->manager_id !== $user->id) {
+        if(!$user->isCompanyManager() || $company->manager_id !== $user->id) {
 
             return $this->errorResponse('No registered business organization profile linked to your account context', 422);
         }
