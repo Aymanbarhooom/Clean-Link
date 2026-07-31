@@ -257,6 +257,27 @@ class ServiceController extends Controller
             'Skills attached to the service successfully'
         );
     }
+
+    /**
+     * Remove one or more required skills from a specific service.
+     * Route: DELETE /api/services/{service}/skills
+     */
+    public function detachSkills(Request $request, Service $service): JsonResponse
+    {
+        $this->authorize('update', $service);
+
+        $validated = $request->validate([
+            'skill_ids' => 'required|array|min:1',
+            'skill_ids.*' => 'required|integer|exists:skills,id',
+        ]);
+
+        $service->requiredSkills()->detach($validated['skill_ids']);
+
+        return $this->successResponse(
+            $service->load('requiredSkills'),
+            'Skills removed from the service successfully'
+        );
+    }
  
 }
 

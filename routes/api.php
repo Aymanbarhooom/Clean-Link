@@ -150,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // 🎓 Dynamic Skill Assignment Mapping Routes
     // ==========================================
     Route::post('services/{service}/skills', [ServiceController::class, 'attachSkills']);
+    Route::delete('services/{service}/skills', [ServiceController::class, 'detachSkills']);
     Route::post('workers/skills', [CompanyManagerController::class, 'attachSkills']);
     // ==========================================
     // ❤️ (Favorites Engine)

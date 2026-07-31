@@ -60,6 +60,28 @@ class WorkgroupController extends Controller
         return $this->successResponse($query->get(), 'Active workgroups successfully retrieved');
     }
 
+    public function show(Workgroup $workgroup): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isCompanyManager() && !$user->isAdmin()) {
+            return $this->errorResponse('Access restricted to organizational managers', 403);
+        }
+
+        if ($user->isCompanyManager()) {
+            $company = $user->managedCompanies()->first();
+            if (!$company) return $this->successResponse([], 'No business profile attached');
+
+            if ($workgroup->company_id !== $company->id) {
+                return $this->errorResponse('Unauthorized access to this workgroup', 403);
+            }
+        }
+
+        $workgroup->load(['leader', 'workers.profile', 'workers.workerProfile.skills', 'tasks.order.service']);
+
+        return $this->successResponse($workgroup, 'Workgroup details retrieved successfully');
+    }
+
    
     public function store(Request $request): JsonResponse
     {
