@@ -38,6 +38,28 @@ class WorkgroupController extends Controller
         return $this->successResponse($query->get(), 'Workforce groups successfully synchronized');
     }
 
+    public function activeWorkGroups(): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isCompanyManager() && !$user->isAdmin()) {
+            return $this->errorResponse('Access restricted to organizational managers', 403);
+        }
+
+        $query = Workgroup::with(['leader', 'workers.profile', 'workers.workerProfile.skills'])
+            ->whereHas('tasks', function ($taskQuery) {
+                $taskQuery->whereIn('status', ['pending', 'on_way', 'handling']);
+            });
+
+        if ($user->isCompanyManager()) {
+            $company = $user->managedCompanies()->first();
+            if (!$company) return $this->successResponse([], 'No business profile attached');
+            $query->where('company_id', $company->id);
+        }
+
+        return $this->successResponse($query->get(), 'Active workgroups successfully retrieved');
+    }
+
    
     public function store(Request $request): JsonResponse
     {
