@@ -146,33 +146,46 @@ class CompanyController extends Controller
         return $this->successResponse($company, 'Company parameters modified successfully');
     }
 
-    public function getCompanies(): JsonResponse
-    {
-        $user = auth()->user();
+   public function getCompanies(Request $request): JsonResponse
+{
+    $user = auth()->user();
+    $perPage = $request->get('per_page', 6);
 
-        // High-density optimization using relational nested Eager Loading syntax matching clean data schemas 
-        $query = Company::with([
-            'region.manager',
-            'workTimes'
-        ]);
+    // High-density optimization using relational nested Eager Loading syntax matching clean data schemas 
+    $query = Company::with([
+        'region.manager',
+        'workTimes'
+    ]);
 
-        if ($user->role === 'region_manager') {
-            $query->whereHas('region', function ($q) use ($user) {
-                $q->where('manager_id', $user->id);
-            });
-        } elseif ($user->isCompanyManager()) {
-            $query->where('manager_id', $user->id);
-        }
-
-        $companies = $query->get();
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-            return $this->successResponse($companies, 'Companies list retrieved');
-        }
-        return $this->successResponse(
-            CompanyResource::collection($companies),
-            'Companies list retrieved'
-        );
+    if ($user->role === 'region_manager') {
+        $query->whereHas('region', function ($q) use ($user) {
+            $q->where('manager_id', $user->id);
+        });
+    } elseif ($user->isCompanyManager()) {
+        $query->where('manager_id', $user->id);
     }
+
+    // تطبيق Pagination بدلاً من get()
+    $companies = $query->orderBy('id', 'asc')->paginate($perPage);
+
+    // تجهيز الـ Response حسب دور المستخدم
+    $responseData = [
+        'data' => $user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager() 
+            ? $companies->items() 
+            : CompanyResource::collection($companies->items()),
+        'pagination' => [
+            'current_page' => $companies->currentPage(),
+            'per_page' => $companies->perPage(),
+            'total' => $companies->total(),
+            'last_page' => $companies->lastPage(),
+            'from' => $companies->firstItem(),
+            'to' => $companies->lastItem(),
+            'has_more_pages' => $companies->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Companies list retrieved');
+}
 
     public function showCompany(Company $company): JsonResponse
     {

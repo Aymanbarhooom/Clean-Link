@@ -48,16 +48,32 @@ class CompanyManagerController extends Controller
         return $this->successResponse($worker->load('workerProfile'), 'Worker profile built successfully', 211);
     }
 
-    public function getWorkers(Company $company): JsonResponse
-    {
-        $workers = User::with(['profile', 'workerProfile'])
-            ->whereHas('workerProfile', function ($query) use ($company) {
-                $query->where('company_id', $company->id);
-            })
-            ->get();
+   public function getWorkers(Request $request, Company $company): JsonResponse
+{
+    $perPage = $request->get('per_page', 6);
+    
+    $workers = User::with(['profile', 'workerProfile'])
+        ->whereHas('workerProfile', function ($query) use ($company) {
+            $query->where('company_id', $company->id);
+        })
+        ->orderBy('id', 'asc')
+        ->paginate($perPage);
+    
+    $responseData = [
+        'data' => $workers->items(),
+        'pagination' => [
+            'current_page' => $workers->currentPage(),
+            'per_page' => $workers->perPage(),
+            'total' => $workers->total(),
+            'last_page' => $workers->lastPage(),
+            'from' => $workers->firstItem(),
+            'to' => $workers->lastItem(),
+            'has_more_pages' => $workers->hasMorePages(),
+        ]
+    ];
 
-        return $this->successResponse($workers, 'Workers lookup index fetched');
-    }
+    return $this->successResponse($responseData, 'Workers lookup index fetched');
+}
 
     public function searchWorker(Request $request): JsonResponse
     {

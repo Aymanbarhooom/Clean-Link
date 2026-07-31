@@ -13,11 +13,27 @@ class SkillController extends Controller
     use ApiResponse;
 
    
-    public function index(): JsonResponse
-    {
-        $skills = Skill::orderBy('id', 'asc')->get();
-        return $this->successResponse($skills, 'Skills dictionary fetched successfully');
-    }
+    public function index(Request $request): JsonResponse
+{
+    $perPage = $request->get('per_page', 6);
+    
+    $skills = Skill::orderBy('id', 'asc')->paginate($perPage);
+    
+    $responseData = [
+        'data' => $skills->items(),
+        'pagination' => [
+            'current_page' => $skills->currentPage(),
+            'per_page' => $skills->perPage(),
+            'total' => $skills->total(),
+            'last_page' => $skills->lastPage(),
+            'from' => $skills->firstItem(),
+            'to' => $skills->lastItem(),
+            'has_more_pages' => $skills->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Skills dictionary fetched successfully');
+}
 
    
     public function store(Request $request): JsonResponse

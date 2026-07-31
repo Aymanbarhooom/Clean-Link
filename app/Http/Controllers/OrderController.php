@@ -358,34 +358,60 @@ class OrderController extends Controller
     }
 
     public function index(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', Order::class);
+{
+    $this->authorize('viewAny', Order::class);
 
-        $user = auth()->user();
+    $user = auth()->user();
+    $perPage = $request->get('per_page', 10);
 
-        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
+    $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
-        if ($user->isAdmin()) {
-            // admin sees everything
-        } elseif ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company)
-                return $this->successResponse([], 'No company registered');
+    if ($user->isAdmin()) {
+        // admin sees everything
+    } elseif ($user->isCompanyManager()) {
+        $company = $user->managedCompanies()->first();
+        if (!$company)
+            return $this->successResponse([
+                'data' => [],
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                    'from' => null,
+                    'to' => null,
+                    'has_more_pages' => false,
+                ]
+            ], 'No company registered');
 
-            $query->whereHas('package.service', function ($q) use ($company) {
-                $q->where('company_id', $company->id);
-            });
-        } elseif ($user->role === 'region_manager') {
-            $query->whereHas('package.service.company', function ($q) use ($user) {
-                $q->where('region_id', $user->managedRegions()->pluck('id'));
-            });
-        } else {
-            $query->where('client_id', $user->id);
-        }
-
-        $orders = $query->orderBy('created_at', 'desc')->get();
-        return $this->successResponse(OrderResource::collection($orders), 'Orders index fetched successfully');
+        $query->whereHas('package.service', function ($q) use ($company) {
+            $q->where('company_id', $company->id);
+        });
+    } elseif ($user->role === 'region_manager') {
+        $query->whereHas('package.service.company', function ($q) use ($user) {
+            $q->whereIn('region_id', $user->managedRegions()->pluck('id'));
+        });
+    } else {
+        $query->where('client_id', $user->id);
     }
+
+    $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
+    
+    $responseData = [
+        'data' => OrderResource::collection($orders->items()),
+        'pagination' => [
+            'current_page' => $orders->currentPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+            'last_page' => $orders->lastPage(),
+            'from' => $orders->firstItem(),
+            'to' => $orders->lastItem(),
+            'has_more_pages' => $orders->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Orders index fetched successfully');
+}
 
     public function show(Order $order): JsonResponse
     {
