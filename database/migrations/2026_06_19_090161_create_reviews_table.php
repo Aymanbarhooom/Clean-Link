@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('reviews', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained('users')->onDelete('cascade');
-            $table->text('comment')->nullable();
+            $table->text('comment')->nullable()->default("");
             $table->tinyInteger('rating')->unsigned();
             
             // Polymorphic Columns for Service & Company models
