@@ -22,43 +22,48 @@ class CategoryController extends Controller
 
 
     public function index(Request $request): JsonResponse
-{
-    $cursor = $request->get('cursor', 'default');
+    {
+        // عدد العناصر في كل صفحة - يمكنك تعديله حسب الحاجة
+        $perPage = $request->get('per_page', 10);
 
-    $categories = Category::orderBy('id', 'asc')->cursorPaginate(6);
-    
+        // استخدام paginate بدلاً من cursorPaginate
+        $categories = Category::orderBy('id', 'asc')->paginate($perPage);
 
-    $responseData = [
-        'items' => CategoryResource::collection($categories->items()), // تحويل الـ 10 عناصر الحالية فقط عبر الـ Resource
-        'pagination' => [
-            'next_cursor' => $categories->nextCursor()?->encode(),
-            'prev_cursor' => $categories->previousCursor()?->encode(),
-            'has_more'    => $categories->hasMorePages(),
-        ]
-    ];
+        $responseData = [
+            'data' => CategoryResource::collection($categories->items()),
+            'pagination' => [
+                'current_page' => $categories->currentPage(),
+                'per_page' => $categories->perPage(),
+                'total' => $categories->total(),
+                'last_page' => $categories->lastPage(),
+                'from' => $categories->firstItem(),
+                'to' => $categories->lastItem(),
+                'has_more_pages' => $categories->hasMorePages(),
+            ]
+        ];
 
-    return $this->successResponse($responseData, 'Categories matrix retrieved successfully');
-}
+        return $this->successResponse($responseData, 'Categories retrieved successfully');
+    }
 
 
 
     public function show(Request $request, Category $category): JsonResponse
-{
-    $cacheKey = 'category_' . $category->id . '_with_services_images';
+    {
+        $cacheKey = 'category_' . $category->id . '_with_services_images';
 
-    $cachedCategoryData = Cache::remember($cacheKey, now()->addDay(), function () use ($category) {
-        $category->load('services.images');
-        return $category;
-    });
+        $cachedCategoryData = Cache::remember($cacheKey, now()->addDay(), function () use ($category) {
+            $category->load('services.images');
+            return $category;
+        });
 
-    $user = auth()->user();
+        $user = auth()->user();
 
-    if ($user && ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager())) {
-        return $this->successResponse($cachedCategoryData, 'Category specific parameters loaded');
+        if ($user && ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager())) {
+            return $this->successResponse($cachedCategoryData, 'Category specific parameters loaded');
+        }
+
+        return $this->successResponse(new CategoryResource($cachedCategoryData), 'Category specific parameters loaded');
     }
-
-    return $this->successResponse(new CategoryResource($cachedCategoryData), 'Category specific parameters loaded');
-}
 
 
     public function store(Request $request): JsonResponse
