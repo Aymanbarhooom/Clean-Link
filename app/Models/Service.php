@@ -21,7 +21,8 @@ class Service extends Model
         'rating',
         'min_duration',
         'max_duration',
-        'price',
+        'minimum_price',
+        'maximum_price',
         'image',
         'discount'
     ];
@@ -31,7 +32,8 @@ class Service extends Model
         'rating' => 'float',
         'min_duration' => 'integer',
         'max_duration' => 'integer',
-        'price' => 'float',
+        'minimum_price' => 'float',
+        'maximum_price' => 'float',
         'discount' => 'float',
     ];
 

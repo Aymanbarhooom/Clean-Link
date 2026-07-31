@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CategoryNameResource;
 use App\Http\Resources\CategoryResource;
 use App\Models\Category;
 use App\Traits\ApiResponse;
@@ -111,5 +112,11 @@ class CategoryController extends Controller
 
         $category->delete();
         return $this->successResponse([], 'Category scrubbed from architecture records');
+    }
+
+    public function getCategoriesNames(): JsonResponse
+    {
+        $regions = Category::all();
+        return $this->successResponse(CategoryNameResource::collection($regions), 'Categories names retrieved successfully');
     }
 }

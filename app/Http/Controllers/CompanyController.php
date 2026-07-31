@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CompanyNameResource;
 use App\Http\Resources\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
@@ -189,5 +190,11 @@ class CompanyController extends Controller
         $this->authorize('delete', $company);
         $company->delete();
         return $this->successResponse([], 'Company wiped from registry indices');
+    }
+
+    public function getCompaniesNames(): JsonResponse
+    {
+        $companies = Company::all();
+        return $this->successResponse(CompanyNameResource::collection($companies), 'Companies names retrieved successfully');
     }
 }
