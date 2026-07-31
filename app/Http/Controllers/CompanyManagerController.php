@@ -59,6 +59,35 @@ class CompanyManagerController extends Controller
         return $this->successResponse($workers, 'Workers lookup index fetched');
     }
 
+    public function searchWorker(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user->isCompanyManager() && !$user->isAdmin()) {
+            return $this->errorResponse('Access restricted to company managers', 403);
+        }
+
+        $validated = $request->validate([
+            'query' => 'required|string|min:1',
+        ]);
+
+        $query = trim($validated['query']);
+
+        $workersQuery = User::with(['profile', 'workerProfile'])
+            ->whereHas('workerProfile', function ($workerProfileQuery) use ($user) {
+                if ($user->isCompanyManager()) {
+                    $companyIds = $user->managedCompanies()->pluck('companies.id');
+                    $workerProfileQuery->whereIn('company_id', $companyIds);
+                }
+            })
+            ->where(function ($searchQuery) use ($query) {
+                $searchQuery->where('fullname', 'like', "%{$query}%")
+                    ->orWhere('email', 'like', "%{$query}%");
+            });
+
+        return $this->successResponse($workersQuery->get(), 'Workers search results fetched');
+    }
+
     public function updateWorker(Request $request, User $worker): JsonResponse
     {
         $this->authorize('update', $worker);

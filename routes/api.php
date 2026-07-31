@@ -90,6 +90,7 @@ Route::middleware('auth:sanctum')->group(function () {
     //  Field Workers Management Scope (Company Manager Operations)
     Route::prefix('workers')->group(function () {
         Route::post('/', [CompanyManagerController::class, 'addWorker']);
+        Route::get('/search', [CompanyManagerController::class, 'searchWorker']);
         Route::get('/{company}', [CompanyManagerController::class, 'getWorkers']);
         Route::put('/{worker}', [CompanyManagerController::class, 'updateWorker']);
         Route::delete('/{worker}', [CompanyManagerController::class, 'deleteWorker']);
@@ -164,6 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // 👥 Operational Crews & Workgroups Management
     // ==========================================
+    Route::get('workgroups/active', [WorkgroupController::class, 'activeWorkGroups']);
     Route::apiResource('workgroups', WorkgroupController::class);
 
 
