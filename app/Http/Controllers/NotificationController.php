@@ -7,6 +7,7 @@ use App\Http\Resources\NotificationResource;
 use App\Models\Notification;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Request;
 
 class NotificationController extends Controller
 {
@@ -17,15 +18,30 @@ class NotificationController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    public function index(): JsonResponse
-    {
-        $notifications = auth()->user()
-            ->notifications()
-            ->orderBy('created_at', 'desc')
-            ->get();
+    public function index(Request $request): JsonResponse
+{
+    $perPage = $request->get('per_page', 6);
+    
+    $notifications = auth()->user()
+        ->notifications()
+        ->orderBy('created_at', 'desc')
+        ->paginate($perPage);
+    
+    $responseData = [
+        'data' => NotificationResource::collection($notifications->items()),
+        'pagination' => [
+            'current_page' => $notifications->currentPage(),
+            'per_page' => $notifications->perPage(),
+            'total' => $notifications->total(),
+            'last_page' => $notifications->lastPage(),
+            'from' => $notifications->firstItem(),
+            'to' => $notifications->lastItem(),
+            'has_more_pages' => $notifications->hasMorePages(),
+        ]
+    ];
 
-        return $this->successResponse(NotificationResource::collection($notifications), 'Your notifications inbox synchronized successfully');
-    }
+    return $this->successResponse($responseData, 'Your notifications inbox synchronized successfully');
+}
 
     public function markAsRead(Notification $notification): JsonResponse
     {

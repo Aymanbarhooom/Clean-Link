@@ -24,7 +24,7 @@ class CategoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         // عدد العناصر في كل صفحة - يمكنك تعديله حسب الحاجة
-        $perPage = $request->get('per_page', 10);
+        $perPage = $request->get('per_page', 6);
 
         // استخدام paginate بدلاً من cursorPaginate
         $categories = Category::orderBy('id', 'asc')->paginate($perPage);

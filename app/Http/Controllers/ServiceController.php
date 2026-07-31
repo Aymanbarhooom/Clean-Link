@@ -25,21 +25,38 @@ class ServiceController extends Controller
      * Route: GET /api/services?company_id=1
      */
     public function index(Request $request): JsonResponse
-    {
-        $query = Service::with(['company.region']);
+{
+    $user = auth()->user();
+    $perPage = $request->get('per_page', 6);
+    
+    $query = Service::with(['company.region']);
 
-        // Allow conditional filtering by company context if passed by the frontend
-        if ($request->has('company_id')) {
-            $query->where('company_id', $request->company_id);
-        }
-
-        $services = $query->orderBy('rating', 'desc')->get();
-        $user = auth()->user();
-        if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
-         return $this->successResponse($services, 'Services list successfully synchronized');   
-        }
-        return $this->successResponse(ServiceResource::collection($services), 'Services list successfully synchronized');
+    // Allow conditional filtering by company context if passed by the frontend
+    if ($request->has('company_id')) {
+        $query->where('company_id', $request->company_id);
     }
+
+    // تطبيق Pagination مع الترتيب حسب التقييم
+    $services = $query->orderBy('rating', 'desc')->paginate($perPage);
+
+    // تجهيز الـ Response حسب دور المستخدم
+    $responseData = [
+        'data' => ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager())
+            ? $services->items()
+            : ServiceResource::collection($services->items()),
+        'pagination' => [
+            'current_page' => $services->currentPage(),
+            'per_page' => $services->perPage(),
+            'total' => $services->total(),
+            'last_page' => $services->lastPage(),
+            'from' => $services->firstItem(),
+            'to' => $services->lastItem(),
+            'has_more_pages' => $services->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Services list successfully synchronized');
+}
 
     /**
      * Return a single service loaded with its custom configurations and metadata.
