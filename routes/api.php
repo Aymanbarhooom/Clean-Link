@@ -20,6 +20,7 @@ use App\Http\Controllers\SkillController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\WorkerProfileController;
 use App\Http\Controllers\WorkgroupController;
+use App\Http\Controllers\WorkTimesController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -63,6 +64,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::delete('/managers/{manager}', [RegionController::class, 'deleteManager']);
     });
+    //names
+    Route::get('categories/names', [CategoryController::class, 'getCategoriesNames']);
+    Route::get('companies/names', [CompanyController::class, 'getCompaniesNames']);
+
+
     Route::get('/managers', [RegionController::class, 'getManagers']);
     //  Companies & Company Managers Management Scope
     Route::prefix('companies')->group(function () {
@@ -72,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{company}', [CompanyController::class, 'showCompany']);
         Route::put('/{company}', [CompanyController::class, 'updateCompany']);
         Route::delete('/{company}', [CompanyController::class, 'deleteCompany']);
+
 
         // Specialized Corporate Leaders Mapping Roles
         Route::post('/managers', [CompanyController::class, 'addManager']);
@@ -89,6 +96,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('categories', CategoryController::class);
+
 
     Route::prefix('admin/search')->group(function () {
         Route::get('/region-managers', [AdminController::class, 'searchRegionManagers']);
@@ -112,7 +120,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{worker}', [WorkerProfileController::class, 'show']);
         Route::put('/', [WorkerProfileController::class, 'update']);
         Route::post('/evaluateWorker', [WorkerProfileController::class, 'evaluateWorker']);
-
     });
 
     Route::prefix('attributes')->group(function () {
@@ -152,7 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/service-images', [ServiceImageController::class, 'store']);
-    Route::post('/work-times', [CompanyManagerController::class, 'insertOrUpdate']);
+    Route::post('/work-times', [WorkTimesController::class, 'insertOrUpdate']);
 
     // ==========================================
     // 👥 Operational Crews & Workgroups Management
@@ -181,8 +188,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('orders/{order}/qualified-groups', [OrderController::class, 'getQualifiedGroups']);
 
     // ==========================================
-// 🔔 صندوق وارد الإشعارات (In-App Notifications Inbox)
-// ==========================================
+    // 🔔 صندوق وارد الإشعارات (In-App Notifications Inbox)
+    // ==========================================
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead']);
     Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);

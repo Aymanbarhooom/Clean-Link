@@ -63,7 +63,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.20,
             'min_duration' => 120,
             'max_duration' => 180,
-            'price' => 50.00,
+            'minimum_price' => 55.00,
+            'maximum_price' => 95.00,
             'image' => 'services/standard_apartment.jpg',
             'discount' => 0.00,
         ]);
@@ -91,8 +92,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.90,
             'min_duration' => 240,
             'max_duration' => 360,
-            'price' => 120.00,
-            'image' => 'services/deep_home.jpg',
+            'minimum_price' => 80.00,
+            'maximum_price' => 210.00,            'image' => 'services/deep_home.jpg',
             'discount' => 0.00,
         ]);
         $s2->attributes()->attach([
@@ -117,8 +118,8 @@ class ServiceSeeder extends Seeder
             'rating' => 3.80,
             'min_duration' => 300,
             'max_duration' => 480,
-            'price' => 200.00,
-            'image' => 'services/post_con.jpg',
+            'minimum_price' => 10.00,
+            'maximum_price' => 100.00,            'image' => 'services/post_con.jpg',
             'discount' => 20.00,
         ]);
         $s3->attributes()->attach([
@@ -142,8 +143,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.50,
             'min_duration' => 90,
             'max_duration' => 150,
-            'price' => 45.00,
-            'image' => 'services/kitchen.jpg',
+            'minimum_price' => 20.00,
+            'maximum_price' => 50.00,            'image' => 'services/kitchen.jpg',
             'discount' => 0.00,
         ]);
         $s4->attributes()->attach([
@@ -163,8 +164,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.70,
             'min_duration' => 360,
             'max_duration' => 600,
-            'price' => 350.00,
-            'image' => 'services/villa.jpg',
+            'minimum_price' => 40.00,
+            'maximum_price' => 110.00,            'image' => 'services/villa.jpg',
             'discount' => 0.00,
         ]);
         $s5->attributes()->attach([
@@ -192,8 +193,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.10,
             'min_duration' => 30,
             'max_duration' => 45,
-            'price' => 15.00,
-            'image' => 'services/eco_wash.jpg',
+            'minimum_price' => 10.00,
+            'maximum_price' => 30.00,            'image' => 'services/eco_wash.jpg',
             'discount' => 10.00,
         ]);
         $s6->attributes()->attach([
@@ -215,7 +216,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.80,
             'min_duration' => 60,
             'max_duration' => 90,
-            'price' => 35.00,
+            'minimum_price' => 125.00,
+            'maximum_price' => 225.00,
             'image' => 'services/full_car.jpg',
             'discount' => 0.00,
         ]);
@@ -240,8 +242,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.60,
             'min_duration' => 90,
             'max_duration' => 120,
-            'price' => 60.00,
-            'image' => 'services/car_steam.jpg',
+            'minimum_price' => 50.00,
+            'maximum_price' => 90.00,            'image' => 'services/car_steam.jpg',
             'discount' => 0.00,
         ]);
         $s8->attributes()->attach([
@@ -262,8 +264,8 @@ class ServiceSeeder extends Seeder
             'rating' => 3.50,
             'min_duration' => 40,
             'max_duration' => 60,
-            'price' => 25.00,
-            'image' => 'services/headlights.jpg',
+            'minimum_price' => 49.00,
+            'maximum_price' => 99.00,            'image' => 'services/headlights.jpg',
             'discount' => 5.00,
         ]);
         $s9->attributes()->attach([
@@ -283,7 +285,8 @@ class ServiceSeeder extends Seeder
             'rating' => 4.95, 
             'min_duration' => 180, 
             'max_duration' => 300, 
-            'price' => 150.00, 
+            'minimum_price' => 60.00,
+            'maximum_price' => 120.00,
             'image' => 'services/showroom.jpg', 
             'discount' => 0.00,]);
         $s10->attributes()->attach([

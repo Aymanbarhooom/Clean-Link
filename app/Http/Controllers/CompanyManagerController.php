@@ -59,8 +59,6 @@ class CompanyManagerController extends Controller
         return $this->successResponse($workers, 'Workers lookup index fetched');
     }
 
-
-
     public function updateWorker(Request $request, User $worker): JsonResponse
     {
         $this->authorize('update', $worker);
