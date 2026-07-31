@@ -77,7 +77,7 @@ class WorkgroupController extends Controller
             }
         }
 
-        $workgroup->load(['leader', 'workers.profile', 'workers.workerProfile.skills', 'tasks.order.service']);
+        $workgroup->load(['leader', 'workers.profile', 'workers.workerProfile.skills', 'tasks.order.package.service']);
 
         return $this->successResponse($workgroup, 'Workgroup details retrieved successfully');
     }
