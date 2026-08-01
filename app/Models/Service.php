@@ -73,6 +73,16 @@ class Service extends Model
         return $this->morphMany(Favorite::class, 'favoritable');
     }
 
+    public function complaints(): MorphMany
+{
+    return $this->morphMany(Complaint::class, 'complaintable');
+}
+
+public function unreadComplaints()
+{
+    return $this->complaints()->where('is_read', false);
+}
+
 
 
     // --- Helper Functions ---
@@ -81,6 +91,7 @@ class Service extends Model
     {
         return max(0, $this->price - $this->discount);
     }
+    
 
     public function recalculateRating(): void
     {

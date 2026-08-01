@@ -64,96 +64,173 @@ class HomeController extends Controller
     }
 
     public function search(Request $request): JsonResponse
-    {
-        $request->validate([
-            'query' => 'required|string|max:255',
-            'region_id' => 'nullable|numeric', // Enforce numeric region ID validation
-        ]);
+{
+    $request->validate([
+        'query'           => 'required|string|max:255',
+        'region_id'       => 'nullable|integer',
+        'rating'          => 'nullable|numeric|min:0|max:5',
+        'minimum_price'   => 'nullable|numeric|min:0',
+        'maximum_price'   => 'nullable|numeric|min:0',
+    ]);
 
-        $searchQuery = $request->input('query');
-        $regionId = $request->input('region_id');
+    $searchQuery = $request->input('query');
+    $regionId = $request->input('region_id');
 
-        // 1. Search in Regions
-        $regionsQuery = Region::where(function ($query) use ($searchQuery) {
-            $query->where("name_en", 'LIKE', "%{$searchQuery}%")
-                ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
-        });
+    /*
+    |--------------------------------------------------------------------------
+    | Regions
+    |--------------------------------------------------------------------------
+    */
 
-        if ($regionId) {
-            $regionsQuery->where('id', (int) $regionId);
-        }
-        $regions = $regionsQuery->with('manager')->get();
+    $regionsQuery = Region::where(function ($query) use ($searchQuery) {
+        $query->where('name_en', 'LIKE', "%{$searchQuery}%")
+            ->orWhere('name_ar', 'LIKE', "%{$searchQuery}%");
+    });
 
-        // 2. Search in Categories
-        $categories = Category::where("name_en", 'LIKE', "%{$searchQuery}%")
-            ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%")
-            ->get();
-
-        // 3. Search in Companies (Filtered by Region & Rating)
-        $companiesQuery = Company::where(function ($query) use ($searchQuery) {
-            $query->where("name_en", 'LIKE', "%{$searchQuery}%")
-                ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
-        });
-
-        if ($regionId) {
-            $companiesQuery->where('region_id', (int) $regionId);
-        }
-
-        if ($request->filled('rating')) {
-            $rating = (float) $request->input('rating');
-            $companiesQuery->where('rating', '>=', $rating);
-        }
-        $companies = $companiesQuery->get();
-        $companies->load('workTimes');
-
-        // 4. Search in Services (Filtered by Region & Rating)
-        $servicesQuery = Service::query()
-            ->where(function ($query) use ($searchQuery) {
-                $query->where("name_en", 'LIKE', "%{$searchQuery}%")
-                    ->orWhere("name_ar", 'LIKE', "%{$searchQuery}%");
-            });
-
-        if ($regionId) {
-            $servicesQuery->whereHas('company', function ($query) use ($regionId) {
-                $query->where('region_id', (int) $regionId);
-            });
-        }
-
-        if ($request->filled('price_range')) {
-            $priceRange = trim((string) $request->input('price_range'));
-            if (preg_match('/^\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*\$?\s*$/i', $priceRange, $matches)) {
-                $servicesQuery->whereBetween('price', [(float) $matches[1], (float) $matches[2]]);
-            }
-        }
-
-        if ($request->filled('rating')) {
-            $rating = (float) $request->input('rating');
-            $servicesQuery->where('rating', '>=', $rating);
-        }
-
-        $services = $servicesQuery
-            ->orderBy('rating', 'desc')
-            ->get();
-
-        // 5. Filter Offers
-        $offers = $services->where('discount', '>', 0)->take(5)->values();
-
-        return $this->successResponse([
-            'regions' => RegionResource::collection($regions),
-            'categories' => CategoryResource::collection($categories),
-            'companies' => CompanyResource::collection($companies),
-            'services' => ServiceResource::collection($services),
-            'offers' => ServiceResource::collection($offers),
-        ], "Search index results generated for term: '{$searchQuery}'");
+    if ($regionId) {
+        $regionsQuery->where('id', $regionId);
     }
 
+    $regions = $regionsQuery->with('manager')->get();
 
-    public function getoffers(): JsonResponse
+    /*
+    |--------------------------------------------------------------------------
+    | Categories
+    |--------------------------------------------------------------------------
+    */
+
+    $categories = Category::where('name_en', 'LIKE', "%{$searchQuery}%")
+        ->orWhere('name_ar', 'LIKE', "%{$searchQuery}%")
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Companies
+    |--------------------------------------------------------------------------
+    */
+
+    $companiesQuery = Company::where(function ($query) use ($searchQuery) {
+        $query->where('name_en', 'LIKE', "%{$searchQuery}%")
+            ->orWhere('name_ar', 'LIKE', "%{$searchQuery}%");
+    });
+
+    if ($regionId) {
+        $companiesQuery->where('region_id', $regionId);
+    }
+
+    if ($request->filled('rating')) {
+        $companiesQuery->where(
+            'rating',
+            '>=',
+            (float) $request->input('rating')
+        );
+    }
+
+    $companies = $companiesQuery
+        ->with('workTimes')
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Services
+    |--------------------------------------------------------------------------
+    */
+
+    $servicesQuery = Service::query()
+        ->where(function ($query) use ($searchQuery) {
+            $query->where('name_en', 'LIKE', "%{$searchQuery}%")
+                ->orWhere('name_ar', 'LIKE', "%{$searchQuery}%");
+        });
+
+    if ($regionId) {
+        $servicesQuery->whereHas('company', function ($query) use ($regionId) {
+            $query->where('region_id', $regionId);
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Price overlap filter
+    |--------------------------------------------------------------------------
+    */
+
+    if (
+        $request->filled('minimum_price') &&
+        $request->filled('maximum_price')
+    ) {
+        $userMin = (float) $request->input('minimum_price');
+        $userMax = (float) $request->input('maximum_price');
+
+        if ($userMin > $userMax) {
+            [$userMin, $userMax] = [$userMax, $userMin];
+        }
+
+        $servicesQuery
+            ->where('minimum_price', '<=', $userMax)
+            ->where('maximum_price', '>=', $userMin);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Rating filter
+    |--------------------------------------------------------------------------
+    */
+
+    if ($request->filled('rating')) {
+        $servicesQuery->where(
+            'rating',
+            '>=',
+            (float) $request->input('rating')
+        );
+    }
+
+    $services = $servicesQuery
+        ->orderByDesc('rating')
+        ->get();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Offers
+    |--------------------------------------------------------------------------
+    */
+
+    $offers = $services
+        ->where('discount', '>', 0)
+        ->take(5)
+        ->values();
+
+    return $this->successResponse([
+        'regions' => RegionResource::collection($regions),
+        'categories' => CategoryResource::collection($categories),
+        'companies' => CompanyResource::collection($companies),
+        'services' => ServiceResource::collection($services),
+        'offers' => ServiceResource::collection($offers),
+    ], "Search index results generated for term: '{$searchQuery}'");
+}
+
+
+    public function getOffers(Request $request): JsonResponse
     {
+        $perPage = $request->get('per_page', 6);
+
         $offers = Service::where('discount', '>', 0)
             ->orderBy('discount', 'desc')
-            ->get();
-        return $this->successResponse(ServiceResource::collection($offers), "Offers retrieved successfully");
+            ->paginate($perPage);
+
+        $responseData = [
+            'data' => ServiceResource::collection($offers->items()),
+            'pagination' => [
+                'current_page' => $offers->currentPage(),
+                'per_page' => $offers->perPage(),
+                'total' => $offers->total(),
+                'last_page' => $offers->lastPage(),
+                'from' => $offers->firstItem(),
+                'to' => $offers->lastItem(),
+                'has_more_pages' => $offers->hasMorePages(),
+            ]
+        ];
+
+        return $this->successResponse($responseData, "Offers retrieved successfully");
     }
 
     public function userSummary(): JsonResponse

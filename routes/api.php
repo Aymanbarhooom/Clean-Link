@@ -8,6 +8,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyManagerController;
+use App\Http\Controllers\ComplaintController;
+use App\Http\Controllers\ComplaintResponseController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PackageController;
@@ -196,4 +198,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{notification}/mark-as-read', [NotificationController::class, 'markAsRead']);
     Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+
+    Route::prefix('complaints')->group(function () {
+        Route::get('/', [ComplaintController::class, 'index']);
+        Route::post('/', [ComplaintController::class, 'store']);
+        Route::get('/unread-count', [ComplaintController::class, 'unreadCount']);
+        Route::get('/{complaint}', [ComplaintController::class, 'show']);
+        Route::put('/{complaint}', [ComplaintController::class, 'update']);
+        Route::delete('/{complaint}', [ComplaintController::class, 'destroy']);
+        Route::post('/{complaint}/mark-read', [ComplaintController::class, 'markAsRead']);
+        Route::post('/{complaint}/mark-unread', [ComplaintController::class, 'markAsUnread']);
+    });
+
+    // Complaint Response routes
+    Route::prefix('complaint-responses')->group(function () {
+        Route::post('/', [ComplaintResponseController::class, 'store']);
+        Route::get('/', [ComplaintResponseController::class, 'index']);
+        Route::put('/{response}', [ComplaintResponseController::class, 'update']);
+        Route::delete('/{response}', [ComplaintResponseController::class, 'destroy']);
+    });
 });
