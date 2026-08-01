@@ -64,6 +64,16 @@ class Company extends Model
         return $this->hasMany(WorkerProfile::class);
     }
 
+    public function complaints(): MorphMany
+{
+    return $this->morphMany(Complaint::class, 'complaintable');
+}
+
+public function unreadComplaints()
+{
+    return $this->complaints()->where('is_read', false);
+}
+
     // --- Helper Functions ---
 
     /**
