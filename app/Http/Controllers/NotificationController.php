@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\NotificationResource;
 use App\Models\Notification;
 use App\Traits\ApiResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Request;
 
 class NotificationController extends Controller
 {
@@ -19,29 +19,29 @@ class NotificationController extends Controller
     }
 
     public function index(Request $request): JsonResponse
-{
-    $perPage = $request->get('per_page', 6);
-    
-    $notifications = auth()->user()
-        ->notifications()
-        ->orderBy('created_at', 'desc')
-        ->paginate($perPage);
-    
-    $responseData = [
-        'data' => NotificationResource::collection($notifications->items()),
-        'pagination' => [
-            'current_page' => $notifications->currentPage(),
-            'per_page' => $notifications->perPage(),
-            'total' => $notifications->total(),
-            'last_page' => $notifications->lastPage(),
-            'from' => $notifications->firstItem(),
-            'to' => $notifications->lastItem(),
-            'has_more_pages' => $notifications->hasMorePages(),
-        ]
-    ];
+    {
+        $perPage = $request->get('per_page', 6);
 
-    return $this->successResponse($responseData, 'Your notifications inbox synchronized successfully');
-}
+        $notifications = auth()->user()
+            ->notifications()
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $responseData = [
+            'data' => NotificationResource::collection($notifications->items()),
+            'pagination' => [
+                'current_page' => $notifications->currentPage(),
+                'per_page' => $notifications->perPage(),
+                'total' => $notifications->total(),
+                'last_page' => $notifications->lastPage(),
+                'from' => $notifications->firstItem(),
+                'to' => $notifications->lastItem(),
+                'has_more_pages' => $notifications->hasMorePages(),
+            ]
+        ];
+
+        return $this->successResponse($responseData, 'Your notifications inbox synchronized successfully');
+    }
 
     public function markAsRead(Notification $notification): JsonResponse
     {
@@ -61,6 +61,7 @@ class NotificationController extends Controller
             ->notifications()
             ->where('is_read', false)
             ->count();
-            
-        return $this->successResponse(['unread_count' => $unreadCount], 'Unread notifications count fetched successfully');}
+
+        return $this->successResponse(['unread_count' => $unreadCount], 'Unread notifications count fetched successfully');
+    }
 }

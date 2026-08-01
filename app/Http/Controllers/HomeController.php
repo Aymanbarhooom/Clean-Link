@@ -101,12 +101,7 @@ class HomeController extends Controller
 
         if ($request->filled('rating')) {
             $rating = (float) $request->input('rating');
-            if (fmod($rating, 1) === 0.0) {
-                $companiesQuery->where('rating', $rating);
-            } else {
-                $companiesQuery->where('rating', '>=', floor($rating))
-                    ->where('rating', '<', ceil($rating));
-            }
+            $companiesQuery->where('rating', '>=', $rating);
         }
         $companies = $companiesQuery->get();
         $companies->load('workTimes');
@@ -133,12 +128,7 @@ class HomeController extends Controller
 
         if ($request->filled('rating')) {
             $rating = (float) $request->input('rating');
-            if (fmod($rating, 1) === 0.0) {
-                $servicesQuery->where('rating', $rating);
-            } else {
-                $servicesQuery->where('rating', '>=', floor($rating))
-                    ->where('rating', '<', ceil($rating));
-            }
+            $servicesQuery->where('rating', '>=', $rating);
         }
 
         $services = $servicesQuery

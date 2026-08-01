@@ -82,6 +82,19 @@ class PackageController extends Controller
         $package->price_after_discount = $service->discount > 0 ? $package->price * (1 - $service->discount / 100) :  $package->price;
         $package->save();
 
+        if($package->price > $service->maximum_price) {
+            $service->update(['maximum_price' => $package->price]);
+        } elseif($package->price < $service->minimum_price) {
+            $service->update(['minimum_price' => $package->price]);
+        }
+
+        if($package->duration > $service->maximum_duration) {
+            $service->update(['maximum_duration' => $package->duration]);
+        } elseif($package->duration < $service->minimum_duration) {
+            $service->update(['minimum_duration' => $package->duration]);
+        }
+       
+
         return $this->successResponse($package, 'New service variant package established successfully', 211);
     }
 
