@@ -80,60 +80,59 @@ class ComplaintController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
-        $perPage = $request->get('per_page', 10);
-
         $query = Complaint::with(['client.profile', 'complaintable']);
 
-        // Role-based filtering
         if ($user->isAdmin()) {
-            $query->where('complaintable_type', Company::class)->orderBy('created_at', 'desc');
-        } 
+            $query->where('complaintable_type', Company::class);
+        }
         elseif ($user->isCompanyManager()) {
-            // Company manager sees complaints about their services only
             $companyIds = $user->managedCompanies()->pluck('id');
-            
+
             if ($companyIds->isEmpty()) {
                 return $this->successResponse([
-                    'data' => [],
-                    'pagination' => $this->emptyPagination($perPage),
+                    'companies_complains' => [],
+                    'services_complains' => [],
+                    'stats' => $this->getComplaintStats($user),
                 ], 'No company registered for this manager');
             }
 
             $query->where('complaintable_type', Service::class)
                 ->whereHas('complaintable', function ($q) use ($companyIds) {
-                    $q->whereIn('company_id', $companyIds);
-                })
-                ->orderBy('created_at', 'desc');
+                    $q->whereIn('company_id', $companyIds->toArray());
+                });
         }
         elseif ($user->role === 'client') {
-            // Client sees their own complaints only
-            $query->where('client_id', $user->id)
-                ->orderBy('created_at', 'desc');
-        } 
+            $query->where('client_id', $user->id);
+        }
         else {
             return $this->errorResponse('Unauthorized to view complaints', 403);
         }
 
-        // Apply filters if provided
         $this->applyFilters($request, $query);
+        $query->orderBy('created_at', 'desc');
 
-        $complaints = $query->paginate($perPage);
+        if ($user->role === 'client') {
+            $companiesComplains = (clone $query)
+                ->where('complaintable_type', Company::class)
+                ->get();
 
-        $responseData = [
-            'data' => $complaints->items(),
-            'pagination' => [
-                'current_page' => $complaints->currentPage(),
-                'per_page' => $complaints->perPage(),
-                'total' => $complaints->total(),
-                'last_page' => $complaints->lastPage(),
-                'from' => $complaints->firstItem(),
-                'to' => $complaints->lastItem(),
-                'has_more_pages' => $complaints->hasMorePages(),
-            ],
+            $servicesComplains = (clone $query)
+                ->where('complaintable_type', Service::class)
+                ->get();
+
+            return $this->successResponse([
+                'companies_complains' => $companiesComplains,
+                'services_complains' => $servicesComplains,
+                'stats' => $this->getComplaintStats($user),
+            ], 'Complaints fetched successfully');
+        }
+
+        $complaints = $query->get();
+
+        return $this->successResponse([
+            'complaints' => $complaints,
             'stats' => $this->getComplaintStats($user),
-        ];
-
-        return $this->successResponse($responseData, 'Complaints fetched successfully');
+        ], 'Complaints fetched successfully');
     }
 
     /**
