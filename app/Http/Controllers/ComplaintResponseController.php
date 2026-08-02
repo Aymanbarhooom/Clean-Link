@@ -7,6 +7,7 @@ use App\Models\ComplaintResponse;
 use App\Models\Company;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\FirebaseNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -33,7 +34,8 @@ class ComplaintResponseController extends Controller
 
         // Find the complaint
         $complaint = Complaint::find($validated['complaint_id']);
-        
+        $client = $complaint->client;
+
         if (!$complaint) {
             return $this->errorResponse('Complaint not found', 404);
         }
@@ -41,7 +43,7 @@ class ComplaintResponseController extends Controller
         // Check authorization for company managers
         if ($user->isCompanyManager()) {
             $canRespond = $this->canManagerRespondToComplaint($user, $complaint);
-            
+
             if (!$canRespond) {
                 return $this->errorResponse('You are not authorized to respond to this complaint', 403);
             }
@@ -65,6 +67,42 @@ class ComplaintResponseController extends Controller
         // Load relationships for response
         $response->load(['responder.profile']);
 
+        $responseNotifications = [
+            'ar' => [
+                'title' => 'تم الرد على شكواك',
+                'body' => "تم الرد على شكواك بخصوص الطلب رقم #{$complaint->id}. شكرًا لاستخدامك خدماتنا.",
+            ],
+            'en' => [
+                'title' => 'Response to Your Complaint',
+                'body' => "We have responded to your complaint regarding order #{$complaint->id}. Thank you for using our services.",
+            ]
+        ];
+        $client->notifications()->create([
+            'title_ar' => $responseNotifications['ar']['title'],
+            'body_ar' => $responseNotifications['ar']['body'],
+            'title_en' => $responseNotifications['en']['title'],
+            'body_en' => $responseNotifications['en']['body'],
+            'is_read' => false,
+            'data' => [
+                'type' => 'complaint_response',
+                'complaint_id' => $complaint->id,
+            ]
+        ]);
+        foreach ($client->fcmTokens as $token) {
+            $notificationTitle = $responseNotifications[$token->lang]['title'] ?? $responseNotifications['en']['title'];
+            $notificationBody = $responseNotifications[$token->lang]['body'] ?? $responseNotifications['en']['body'];
+            app(FirebaseNotificationService::class)->sendPushNotification(
+                $token->token,
+                $notificationTitle,
+                $notificationBody,
+                [
+                    'notification_id' => $client->notifications()->latest()->first()->id,
+                    'type' => 'complaint_response',
+                    'complaint_id' => $complaint->id,
+                ]
+            );
+        }
+
         return $this->successResponse($response, 'Response added successfully', 201);
     }
 
@@ -74,7 +112,7 @@ class ComplaintResponseController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
-        
+
         $request->validate([
             'complaint_id' => 'required|exists:complaints,id',
         ]);
@@ -179,14 +217,14 @@ class ComplaintResponseController extends Controller
 
         // Get the service and check if it belongs to this manager's company
         $service = Service::find($complaint->complaintable_id);
-        
+
         if (!$service) {
             return false;
         }
 
         // Check if the service belongs to a company managed by this user
         $companyIds = $user->managedCompanies()->pluck('id');
-        
+
         return $companyIds->contains($service->company_id);
     }
 
