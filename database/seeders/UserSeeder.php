@@ -18,23 +18,6 @@ class UserSeeder extends Seeder
         ]);
         $admin->profile()->create(['phone' => '+96311000000', 'address' => 'HQ Main Office']);
 
-        // 2. Region Managers
-        $rm1 = User::create([
-            'fullname' => 'Ahmad Region Manager',
-            'email' => 'ahmad.rm@cleaning.com',
-            'password' => Hash::make('password123'),
-            'role' => 'region_manager',
-        ]);
-        $rm1->profile()->create(['phone' => '+96311111111', 'address' => 'North District Hub']);
-
-        $rm2 = User::create([
-            'fullname' => 'Sara Region Manager',
-            'email' => 'sara.rm@cleaning.com',
-            'password' => Hash::make('password123'),
-            'role' => 'region_manager',
-        ]);
-        $rm2->profile()->create(['phone' => '+96311222222', 'address' => 'South District Hub']);
-
         // 3. Company Managers
         $cm1 = User::create([
             'fullname' => 'John Company Manager',

@@ -72,7 +72,6 @@ class RegionController extends Controller
         $validated = $request->validate([
             'name_ar' => 'required|string',
             'name_en' => 'required|string',
-            'manager_id' => 'required|exists:users,id',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if ($request->hasFile('image')) {
@@ -80,6 +79,8 @@ class RegionController extends Controller
             $validated['image'] = $path;
         }
 
+        $validated['manager_id'] = 1;
+        
         $region = Region::create($validated);
         return $this->successResponse($region, 'Region created successfully', 211);
     }
