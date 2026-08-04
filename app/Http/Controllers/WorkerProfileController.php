@@ -172,4 +172,49 @@ class WorkerProfileController extends Controller
             'Skills assigned to the worker profile successfully'
         );
     }
+
+    public function detachSkills(Request $request): JsonResponse
+    {
+        $worker = auth()->user();
+        if (!$worker->isWorker()) {
+            return $this->errorResponse('Target profile identity is not a registered worker', 422);
+        }
+
+        $validated = $request->validate([
+            'skill_ids' => 'required|array|min:1',
+            'skill_ids.*' => 'required|integer|exists:skills,id',
+        ]);
+
+        // Access the workerProfile model extension directly to bridge the pivot table relation mapping
+        $worker->workerProfile->skills()->detach($validated['skill_ids']);
+
+        return $this->successResponse(
+            $worker->load(['workerProfile.skills', 'profile']),
+            'Skills detached from the worker profile successfully'
+        );
+    }
+
+    public function updateImage(Request $request): JsonResponse
+    {
+        $worker = auth()->user();
+        if (!$worker->isWorker()) {
+            return $this->errorResponse('Target profile identity is not a registered worker', 422);
+        }
+
+        $validated = $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
+        ]);
+
+         if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('profile_images', 'public');
+            $validated['image'] = $path;
+        }
+        $worker->profile()->update([
+            'image' => $validated['image'],
+        ]);
+        return $this->successResponse(
+            $worker->load(['profile', 'workerProfile']),
+            'Worker profile image updated successfully'
+        );
+    }
 }

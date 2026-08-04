@@ -117,12 +117,14 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('worker/update-skills', [WorkerProfileController::class, 'attachSkills']);
+    Route::delete('worker/detach-skills', [WorkerProfileController::class, 'detachSkills']);
 
     Route::prefix('worker-profiles')->group(function () {
         Route::get('/me', [WorkerProfileController::class, 'showOwn']);
         Route::get('/{worker}', [WorkerProfileController::class, 'show']);
         Route::put('/', [WorkerProfileController::class, 'update']);
         Route::post('/evaluateWorker', [WorkerProfileController::class, 'evaluateWorker']);
+        Route::post('/update-image', [WorkerProfileController::class, 'updateImage']);
     });
 
     Route::prefix('attributes')->group(function () {
@@ -163,6 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('service-images', [ServiceImageController::class, 'store']);
+    Route::delete('service-images/{id}', [ServiceImageController::class, 'detachImages']);
     Route::post('work-times', [WorkTimesController::class, 'insertOrUpdate']);
 
     // ==========================================

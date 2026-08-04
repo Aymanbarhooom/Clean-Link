@@ -17,7 +17,7 @@ class RegionSeeder extends Seeder
             Region::create([
                 'name_ar' => 'دمشق',
                 'name_en' => 'Damascus',
-                'manager_id' => $managers[0]->id,
+                'manager_id' => 1,
                 'image' => 'regions/damascus.jpg'
             ]);
 
@@ -30,25 +30,25 @@ class RegionSeeder extends Seeder
             Region::create([
                 'name_ar' => 'حمص',
                 'name_en' => 'Homs',
-                'manager_id' => $managers[0]->id,
+                'manager_id' => 1,
                 'image' => 'regions/homs.jpg'
             ]);
             Region::create([
                 'name_ar' => 'اللاذقية',
                 'name_en' => 'Latakia',
-                'manager_id' => $managers[1]->id,
+                'manager_id' => 1,
                 'image' => 'regions/latakia.jpg'
             ]);
             Region::create([
                 'name_ar' => 'حماه',
                 'name_en' => 'Hama',
-                'manager_id' => $managers[1]->id,
+                'manager_id' => 1,
                 'image' => 'regions/hama.jpg'
             ]);
             Region::create([
                 'name_ar' => 'طرطوس',
                 'name_en' => 'Tartus',
-                'manager_id' => $managers[1]->id,
+                'manager_id' => 1,
                 'image' => 'regions/tartus.jpg'
             ]);
         }
