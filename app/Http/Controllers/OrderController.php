@@ -167,12 +167,39 @@ class OrderController extends Controller
         $service = $package->service;
 
         $startTime = Carbon::parse($validated['start_time']);
-        $totalDuration = $package->duration;
+        $baseDuration = (int) $package->duration;
+        $basePrice = $package->price_after_discount ?? $package->price;
+
+        $attributeCalculationItems = [];
+        $pivotPayload = [];
+
+        if (!empty($validated['attributes'])) {
+            if ($package->name_en !== 'Open Package') {
+                return $this->errorResponse('Attributes can be added only to the Open Package', 422);
+            }
+            foreach ($validated['attributes'] as $item) {
+                $serviceAttributePivot = $service->attributes()->where('attributes.id', $item['id'])->first();
+                $priceAtOrder = $serviceAttributePivot ? (float) $serviceAttributePivot->pivot->price : 0.00;
+                $durationAtOrder = $serviceAttributePivot ? (int) $serviceAttributePivot->pivot->duration : 0;
+
+                $pivotPayload[$item['id']] = [
+                    'qty' => $item['qty'],
+                    'price_at_order' => $priceAtOrder,
+                ];
+
+                $attributeCalculationItems[] = [
+                    'qty' => $item['qty'],
+                    'price' => $priceAtOrder,
+                    'duration' => $durationAtOrder,
+                ];
+            }
+        }
+
+        $attributeTotals = $this->calculateAttributeTotals($attributeCalculationItems, $basePrice, $baseDuration);
+        $totalDuration = $attributeTotals['duration'];
         $endTime = $startTime->copy()->addMinutes($totalDuration);
 
-        $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration) {
-            $basePrice = $package->price_after_discount ?? $package->price;
-
+        $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration, $attributeTotals, $pivotPayload) {
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -182,30 +209,12 @@ class OrderController extends Controller
                 'end_time' => $endTime,
                 'duration' => $totalDuration,
                 'status' => 'pending',
-                'total_price' => $basePrice,
+                'total_price' => $attributeTotals['total_price'],
             ]);
 
-            $runningTotalPrice = $basePrice;
-
-            if (!empty($validated['attributes'])) {
-                $pivotPayload = [];
-
-                foreach ($validated['attributes'] as $item) {
-                    $serviceAttributePivot = $service->attributes()->where('attributes.id', $item['id'])->first();
-                    $priceAtOrder = $serviceAttributePivot ? $serviceAttributePivot->pivot->price : 0.00;
-
-                    $pivotPayload[$item['id']] = [
-                        'qty' => $item['qty'],
-                        'price_at_order' => $priceAtOrder,
-                    ];
-
-                    $runningTotalPrice += ($priceAtOrder * $item['qty']);
-                }
-
+            if (!empty($pivotPayload)) {
                 $order->attributes()->attach($pivotPayload);
             }
-
-            $order->update(['total_price' => $runningTotalPrice]);
 
             return $order;
         });
@@ -453,6 +462,37 @@ class OrderController extends Controller
         }
 
         return $results;
+    }
+
+    private function calculateAttributeTotals(array $attributeInputs, float $basePrice, int $baseDuration): array
+    {
+        $runningTotalPrice = $basePrice;
+        $runningTotalDuration = $baseDuration;
+
+        foreach ($attributeInputs as $item) {
+            $qty = (int) ($item['qty'] ?? 1);
+            $price = (float) ($item['price'] ?? 0.0);
+            $duration = (int) ($item['duration'] ?? 0);
+
+            $runningTotalPrice += $price * $qty;
+            $runningTotalDuration += $duration * $qty;
+        }
+
+        return [
+            'total_price' => $runningTotalPrice,
+            'duration' => $this->roundToNextHalfHour($runningTotalDuration),
+        ];
+    }
+
+    private function roundToNextHalfHour(int $minutes): int
+    {
+        if ($minutes <= 0) {
+            return 0;
+        }
+
+        $step = 30;
+
+        return (int) ceil($minutes / $step) * $step;
     }
 
 }

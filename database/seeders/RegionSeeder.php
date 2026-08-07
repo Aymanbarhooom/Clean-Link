@@ -11,9 +11,7 @@ class RegionSeeder extends Seeder
 {
     public function run(): void
     {
-        $managers = User::where('role', 'region_manager')->get();
 
-        if ($managers->count() >= 2) {
             Region::create([
                 'name_ar' => 'دمشق',
                 'name_en' => 'Damascus',
@@ -24,7 +22,7 @@ class RegionSeeder extends Seeder
             Region::create([
                 'name_ar' => 'حلب',
                 'name_en' => 'Aleppo',
-                'manager_id' => $managers[1]->id,
+                'manager_id' =>1,
                 'image' => 'regions/aleppo.jpg'
             ]);
             Region::create([
@@ -52,5 +50,5 @@ class RegionSeeder extends Seeder
                 'image' => 'regions/tartus.jpg'
             ]);
         }
-    }
+    
 }

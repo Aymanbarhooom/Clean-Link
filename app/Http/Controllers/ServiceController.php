@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ServiceResource;
+use App\Models\Package;
 use App\Models\Service;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -139,6 +140,20 @@ class ServiceController extends Controller
 
             return $service;
         });
+
+        Package::create(
+            [
+                'service_id' => $service->id,
+                'name_ar' => $service->name_ar . 'الباقة الأساسية',
+                'name_en' => $service->name_en . 'Basic Package',
+                'duration' => 0,
+                'price' => 0,
+                'price_after_discount'  =>0,
+                'details_ar' => ['الوصف الأساسي للخدمة'],
+                'details_en' => ['Basic service description'],
+                'minimum_workers' => 2
+            ]
+        );
 
         return $this->successResponse(
             $service->load('attributes'), 
