@@ -127,13 +127,6 @@ class AttributeSeeder extends Seeder
                 'name_en' => 'Post-Construction / Renovation Cleaning',
                 'type' => 'boolean',
             ],
-
-            // --- 🚗 Auto & Mobile Vehicle Detailing Attributes ---
-            [
-                'name_ar' => 'حجم السيارة (صغيرة / صالون / عائلية كبيرة)',
-                'name_en' => 'Vehicle Size (Sedan / SUV / Large van)',
-                'type' => 'text', // Standardized scaling choice text entry
-            ],
             [
                 'name_ar' => 'عدد السيارات الإضافية',
                 'name_en' => 'Number of Extra Cars',
@@ -175,11 +168,6 @@ class AttributeSeeder extends Seeder
                 'name_ar' => 'عدد مقاعد الكنب (الصوفا)',
                 'name_en' => 'Number of Sofa Seats',
                 'type' => 'number',
-            ],
-            [
-                'name_ar' => 'نوع قماش الأثاث (جلد / مخمل / حرير)',
-                'name_en' => 'Fabric Type (Leather / Velvet / Silk)',
-                'type' => 'text',
             ],
             [
                 'name_ar' => 'تنظيف مراتب السرير (دوشك)',
