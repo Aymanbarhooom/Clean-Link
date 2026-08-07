@@ -19,6 +19,20 @@ class PackageSeeder extends Seeder
         $services = Service::all();
 
         foreach ($services as $service) {
+
+        Package::create(
+            [
+                'service_id' => $service->id,
+                'name_ar' =>  'الباقة المفتوحة',
+                'name_en' =>  'Open Package',
+                'duration' => 0,
+                'price' => 0,
+                'price_after_discount'  =>0,
+                'details_ar' => ['الوصف الأساسي للخدمة'],
+                'details_en' => ['Basic service description'],
+                'minimum_workers' => 2
+            ]
+        );
             
             // Check if the parent company or service links to the Residential Cleaning Vertical
             if ($service->category_id === $homeCleaning?->id || $service->company?->category_id === $homeCleaning?->id) {

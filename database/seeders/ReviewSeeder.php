@@ -19,9 +19,9 @@ class ReviewSeeder extends Seeder
 
         // Standardized custom templates list to cycle variations over iterations
         $templates = [
-            ['client_id' => 6, 'rating' => 5, 'comment' => 'Excellent and highly professional service, will absolutely book again!'],
-            ['client_id' => 7, 'rating' => 4, 'comment' => 'Very good service, workers are highly punctual and cleaning quality is great.'],
-            ['client_id' => 8, 'rating' => 3, 'comment' => 'good experience and polite staff.']
+            ['client_id' => 4, 'rating' => 5, 'comment' => 'Excellent and highly professional service, will absolutely book again!'],
+            ['client_id' => 5, 'rating' => 4, 'comment' => 'Very good service, workers are highly punctual and cleaning quality is great.'],
+            ['client_id' => 6, 'rating' => 3, 'comment' => 'good experience and polite staff.']
         ];
 
         // Run the main sequential loop across 10 elements
