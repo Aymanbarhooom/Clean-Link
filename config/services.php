@@ -35,5 +35,8 @@ return [
         'project_id' => env('FCM_PROJECT_ID'),
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
+    'google' => [
+        'routes_api_key' => env('GOOGLE_ROUTES_API_KEY'),
+    ],
 
 ];

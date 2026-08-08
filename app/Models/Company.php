@@ -21,9 +21,16 @@ class Company extends Model
         'image',
         'location_ar',
         'location_en',
+        'latitude',
+        'longitude',
         'rating',
     ];
     protected $appends = ['is_favorite'];
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'rating' => 'float',
+    ];
 
 
     public function manager(): BelongsTo

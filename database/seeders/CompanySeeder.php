@@ -32,6 +32,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/ecoclean.jpg',
             'location_ar' => 'دمشق - المزة',
             'location_en' => 'Damascus - Mazzeh',
+            'latitude' => 33.5138,
+             'longitude' => 36.2765,
             'rating' => 5.00,
         ],
         [
@@ -44,6 +46,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/sparkle.jpg',
             'location_ar' => 'حلب - الشهباء',
             'location_en' => 'Aleppo - Al-Shahbaa',
+            'latitude' => 36.5928,
+            'longitude' => 37.9362,
             'rating' => 4.80,
         ],
         [
@@ -56,6 +60,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/homecare.jpg',
             'location_ar' => 'حمص - جورة الشياح',
             'location_en' => 'Homs - Jouret al-Shayah',
+            'latitude' => 34.7020,
+            'longitude' => 36.7618,
             'rating' => 3.50, // تقييم متوسط
 
         ],
@@ -69,6 +75,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/shine_glass.jpg',
             'location_ar' => 'اللاذقية - الكورنيش',
             'location_en' => 'Lattakia - Corniche',
+            'latitude' => 35.5138,
+            'longitude' => 36.2765,
             'rating' => 4.20,
     
         ],
@@ -82,6 +90,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/naseem.jpg',
             'location_ar' => 'دمشق - مشروع دمر',
             'location_en' => 'Damascus - Dummar Project',
+            'latitude' => 33.5138,
+            'longitude' => 36.2765,
             'rating' => 4.90,
    
         ],
@@ -95,6 +105,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/purity_tanks.jpg',
             'location_ar' => 'حلب - حي الفرقان',
             'location_en' => 'Aleppo - Al-Furqan',
+            'latitude' => 36.2087,
+            'longitude' => 37.1244,
             'rating' => 3.10, // تقييم قليل
          
         ],
@@ -108,6 +120,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/master_pool.jpg',
             'location_ar' => 'حمص - طريق الشام',
             'location_en' => 'Homs - Damascus Road',
+            'latitude' => 34.7020,
+            'longitude' => 36.7618,
             'rating' => 4.50,
    
         ],
@@ -121,6 +135,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/binaa_clean.jpg',
             'location_ar' => 'اللاذقية - جبلة',
             'location_en' => 'Lattakia - Jableh',
+            'latitude' => 35.5138,
+            'longitude' => 36.2765,
             'rating' => 4.00,
 
         ],
@@ -134,6 +150,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/pro_shield.jpg',
             'location_ar' => 'دمشق - كفرسوسة',
             'location_en' => 'Damascus - Kafr Sousa',
+            'latitude' => 33.5138,
+            'longitude' => 36.2765,
             'rating' => 4.75,
 
         ],
@@ -147,6 +165,8 @@ class CompanySeeder extends Seeder
             'image' => 'companies/quick_office.jpg',
             'location_ar' => 'حلب - السليمانية',
             'location_en' => 'Aleppo - Sulaymaniyah',
+            'latitude' => 36.2087,
+            'longitude' => 37.1244,
             'rating' => 2.90, // تقييم قليل جداً
      
         ],
