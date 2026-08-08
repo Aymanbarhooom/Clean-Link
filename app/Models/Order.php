@@ -14,9 +14,12 @@ class Order extends Model
         'package_id',
         'note',
         'location',
+        'latitude',
+        'longitude',
         'start_time',
         'end_time',
         'duration',
+        'travel_buffer_minutes',
         'status',
         'total_price'
     ];
@@ -26,6 +29,8 @@ class Order extends Model
         'end_time' => 'datetime',
         'duration' => 'integer',
         'total_price' => 'float',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     // --- Relationships ---
@@ -66,5 +71,9 @@ class Order extends Model
     public function isAssigned(): bool
     {
         return $this->status === 'assigned_to_worker';
+    }
+    public function effectiveEndTime(): \Carbon\Carbon
+    {
+        return $this->end_time->copy()->addMinutes($this->travel_buffer_minutes);
     }
 }

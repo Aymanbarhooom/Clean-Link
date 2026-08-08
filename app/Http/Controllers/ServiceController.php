@@ -67,6 +67,7 @@ class ServiceController extends Controller
     {
         $service->load([
             'company', 
+           // 'category',
             'packages', 
             'attributes',
             'reviews.client.profile',

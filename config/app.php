@@ -70,7 +70,7 @@ return [
     |
     */
 
-    'timezone' => 'Africa/Cairo',
+    'timezone' => 'Asia/Riyadh',
 
     /*
     |--------------------------------------------------------------------------
@@ -156,7 +156,7 @@ return [
     */
 
     'providers' => ServiceProvider::defaultProviders()->merge([
-        
+
         App\Providers\FCMServiceProvider::class,
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,

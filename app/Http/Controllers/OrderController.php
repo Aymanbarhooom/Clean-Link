@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Services\FirebaseNotificationService;
+use App\Services\GoogleRoutesService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -25,16 +26,48 @@ class OrderController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    public function getAvailableSlots(Package $package): JsonResponse
+    // جوجل- إضافة GoogleRoutesService كـ dependency عبر method injection
+    public function getAvailableSlots(Package $package, Request $request, GoogleRoutesService $routesService): JsonResponse
     {
         $service = $package->service;
         $company = $service->company;
         $packageDuration = $package->duration; // minutes
 
+        // جوجل- التحقق من إحداثيات الطلب المرغوب (تُرسل من الخريطة على الفرونت)
+        $validated = $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+        ]);
+
+        // جوجل- الشركة يجب أن تملك إحداثيات مسبقاً (عمود nullable للترحيل التدريجي)
+        // فشل صريح بدل احتساب خاطئ صامت
+        if (is_null($company->latitude) || is_null($company->longitude)) {
+            return $this->errorResponse('Company location is not configured yet', 422);
+        }
+
+        // جوجل- حساب زمن التنقل مرة واحدة فقط، خارج كل الحلقات (أداء/تكلفة)
+        $oneWayMinutes = $routesService->calculateDrivingRoute(
+            $company->latitude,
+            $company->longitude,
+            $validated['latitude'],
+            $validated['longitude']
+        );
+
+        // جوجل- فشل صريح عند فشل الـ API بدل fallback صامت يؤثر على دقة الجدولة
+        if (is_null($oneWayMinutes)) {
+            return $this->errorResponse('Unable to calculate travel time, please try again', 503);
+        }
+
+        if ($oneWayMinutes > 60) {
+            return $this->errorResponse('Far distance! Please try another company or change your location', 422);
+        }
+
+        // جوجل- ذهاب + إياب، مقرّب للأعلى لأقرب نصف ساعة (وليس لأقرب نصف ساعة عادي)
+        $travelBufferMinutes = (int) (ceil(($oneWayMinutes * 2) / 30) * 30);
+
         $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
         $minimumWorkers = (int) ($package->minimum_workers ?? 1);
 
-        // Fetch company workers who have at least one of the required skills
         $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
             $q->where('company_id', $company->id);
         })
@@ -48,7 +81,6 @@ class OrderController extends Controller
             return $this->errorResponse('Not enough eligible workers to satisfy the package minimum', 422);
         }
 
-        // company work times
         $workTimes = $company->workTimes()->get()->keyBy('day_of_week');
 
         $startDate = Carbon::now();
@@ -72,6 +104,7 @@ class OrderController extends Controller
 
             $companyOpenTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $openHourStr);
             $companyCloseTime = Carbon::createFromFormat('Y-m-d H:i', $currentDayKey . ' ' . $closeHourStr);
+            $oneWayBufferMinutes = (int) (ceil($oneWayMinutes / 30) * 30);
 
             if ($date->isToday()) {
                 $now = Carbon::now();
@@ -82,24 +115,24 @@ class OrderController extends Controller
                     $roundedNow->addHour()->minute(0)->second(0);
                 }
                 $earliestPossibleStart = $roundedNow->addHour();
-                $loopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
+                $baseLoopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
             } else {
-                $loopTime = $companyOpenTime;
+                $baseLoopTime = $companyOpenTime;
             }
+            $loopTime = $baseLoopTime->copy()->addMinutes($oneWayBufferMinutes);
 
             $scheduleMatrix[$currentDayKey] = [];
 
-            while ($loopTime->copy()->addMinutes($packageDuration)->lte($companyCloseTime)) {
+            while ($loopTime->copy()->addMinutes($packageDuration + $travelBufferMinutes)->lte($companyCloseTime)) {
                 $slotStart = $loopTime->copy();
                 $slotEnd = $loopTime->copy()->addMinutes($packageDuration);
+                $slotEffectiveEnd = $slotEnd->copy()->addMinutes($travelBufferMinutes);
 
                 $isSlotAvailable = false;
 
-                // generate combinations of workers of size minimumWorkers
                 $workerCombinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
 
                 foreach ($workerCombinations as $combo) {
-                    // combined skills
                     $combined = collect($combo)
                         ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
                         ->flatten()
@@ -110,20 +143,10 @@ class OrderController extends Controller
                         continue;
                     }
 
-                    // check availability for all workers in combo
                     $conflict = false;
                     foreach ($combo as $worker) {
-                        $hasOverlap = Order::where('status', '!=', 'canceled')
-                            ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
-                                $q->where('users.id', $worker->id);
-                            })
-                            ->where(function ($q) use ($slotStart, $slotEnd) {
-                                $q->where('start_time', '<', $slotEnd)
-                                    ->where('end_time', '>', $slotStart);
-                            })
-                            ->exists();
-
-                        if ($hasOverlap) {
+                        // جوجل- استبدال منطق hasOverlap المكرر بالدالة الموحدة isWorkerAvailable
+                        if (!$this->isWorkerAvailable($worker, $slotStart, $slotEffectiveEnd)) {
                             $conflict = true;
                             break;
                         }
@@ -146,7 +169,7 @@ class OrderController extends Controller
         return $this->successResponse($scheduleMatrix, 'Dynamic slots mapped across active work-time sheets successfully');
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request,  GoogleRoutesService $routesService): JsonResponse
     {
         if (auth()->user()->role !== 'client') {
             return $this->errorResponse('Access restricted to registered customer accounts', 403);
@@ -155,9 +178,10 @@ class OrderController extends Controller
         $validated = $request->validate([
             'package_id' => 'required|exists:packages,id',
             'location' => 'required|string|max:500',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
-
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
@@ -165,8 +189,32 @@ class OrderController extends Controller
 
         $package = Package::with('service.company')->find($validated['package_id']);
         $service = $package->service;
+        $company = $service->company;
 
-        $startTime = Carbon::parse($validated['start_time']);
+        if (is_null($company->latitude) || is_null($company->longitude)) {
+            return $this->errorResponse('Company location is not configured yet', 422);
+        }
+
+        // جوجل- حساب زمن التنقل ذهاباً فقط عبر الخدمة
+        $oneWayMinutes = $routesService->calculateDrivingRoute(
+            $company->latitude,
+            $company->longitude,
+            $validated['latitude'],
+            $validated['longitude']
+        );
+
+        // جوجل- فشل صريح بدل الابتلاع الصامت (بعكس نمط try/catch الموجود لاحقاً في التعيين التلقائي)
+        if (is_null($oneWayMinutes)) {
+            return $this->errorResponse('Unable to calculate travel time, please try again', 503);
+        }
+
+        $travelBufferMinutes = (int) (ceil(($oneWayMinutes * 2) / 30) * 30);
+
+        $startTime = Carbon::createFromFormat(
+            'Y-m-d H:i:s',
+            $request->start_time,
+            'Asia/Riyadh'
+        );
         $baseDuration = (int) $package->duration;
         $basePrice = $package->price_after_discount ?? $package->price;
 
@@ -198,16 +246,21 @@ class OrderController extends Controller
         $attributeTotals = $this->calculateAttributeTotals($attributeCalculationItems, $basePrice, $baseDuration);
         $totalDuration = $attributeTotals['duration'];
         $endTime = $startTime->copy()->addMinutes($totalDuration);
+        $effectiveEndTime = $endTime->copy()->addMinutes($travelBufferMinutes);
+        $totalDuration += $travelBufferMinutes;
 
-        $order = DB::transaction(function () use ($validated, $package, $service, $startTime, $endTime, $totalDuration, $attributeTotals, $pivotPayload) {
+        $order = DB::transaction(function () use ($effectiveEndTime, $travelBufferMinutes, $validated, $package, $service, $startTime, $endTime, $totalDuration, $attributeTotals, $pivotPayload) {
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
                 'location' => $validated['location'],
+                'latitude' => $validated['latitude'],
+                'longitude' => $validated['longitude'],
                 'note' => $validated['note'] ?? null,
                 'start_time' => $startTime,
-                'end_time' => $endTime,
+                'end_time' => $effectiveEndTime,
                 'duration' => $totalDuration,
+                'travel_buffer_minutes' => $travelBufferMinutes,
                 'status' => 'pending',
                 'total_price' => $attributeTotals['total_price'],
             ]);
@@ -253,17 +306,8 @@ class OrderController extends Controller
 
                     $conflict = false;
                     foreach ($combo as $worker) {
-                        $hasOverlap = Order::where('status', '!=', 'canceled')
-                            ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
-                                $q->where('users.id', $worker->id);
-                            })
-                            ->where(function ($q) use ($startTime, $endTime) {
-                                $q->where('start_time', '<', $endTime)
-                                    ->where('end_time', '>', $startTime);
-                            })
-                            ->exists();
-
-                        if ($hasOverlap) {
+                        // جوجل- استبدال hasOverlap المكرر بالدالة الموحدة، مع effectiveEndTime بدل endTime
+                        if (!$this->isWorkerAvailable($worker, $startTime, $effectiveEndTime)) {
                             $conflict = true;
                             break;
                         }
@@ -350,6 +394,7 @@ class OrderController extends Controller
         );
     }
 
+
     public function cancel(Order $order): JsonResponse
     {
         $this->authorize('cancel', $order);
@@ -367,60 +412,60 @@ class OrderController extends Controller
     }
 
     public function index(Request $request): JsonResponse
-{
-    $this->authorize('viewAny', Order::class);
+    {
+        $this->authorize('viewAny', Order::class);
 
-    $user = auth()->user();
-    $perPage = $request->get('per_page', 10);
+        $user = auth()->user();
+        $perPage = $request->get('per_page', 10);
 
-    $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
+        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
-    if ($user->isAdmin()) {
-        // admin sees everything
-    } elseif ($user->isCompanyManager()) {
-        $company = $user->managedCompanies()->first();
-        if (!$company)
-            return $this->successResponse([
-                'data' => [],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => null,
-                    'to' => null,
-                    'has_more_pages' => false,
-                ]
-            ], 'No company registered');
+        if ($user->isAdmin()) {
+            // admin sees everything
+        } elseif ($user->isCompanyManager()) {
+            $company = $user->managedCompanies()->first();
+            if (!$company)
+                return $this->successResponse([
+                    'data' => [],
+                    'pagination' => [
+                        'current_page' => 1,
+                        'per_page' => $perPage,
+                        'total' => 0,
+                        'last_page' => 1,
+                        'from' => null,
+                        'to' => null,
+                        'has_more_pages' => false,
+                    ]
+                ], 'No company registered');
 
-        $query->whereHas('package.service', function ($q) use ($company) {
-            $q->where('company_id', $company->id);
-        });
-    } elseif ($user->role === 'region_manager') {
-        $query->whereHas('package.service.company', function ($q) use ($user) {
-            $q->whereIn('region_id', $user->managedRegions()->pluck('id'));
-        });
-    } else {
-        $query->where('client_id', $user->id);
+            $query->whereHas('package.service', function ($q) use ($company) {
+                $q->where('company_id', $company->id);
+            });
+        } elseif ($user->role === 'region_manager') {
+            $query->whereHas('package.service.company', function ($q) use ($user) {
+                $q->whereIn('region_id', $user->managedRegions()->pluck('id'));
+            });
+        } else {
+            $query->where('client_id', $user->id);
+        }
+
+        $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $responseData = [
+            'data' => OrderResource::collection($orders->items()),
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'last_page' => $orders->lastPage(),
+                'from' => $orders->firstItem(),
+                'to' => $orders->lastItem(),
+                'has_more_pages' => $orders->hasMorePages(),
+            ]
+        ];
+
+        return $this->successResponse($responseData, 'Orders index fetched successfully');
     }
-
-    $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
-    
-    $responseData = [
-        'data' => OrderResource::collection($orders->items()),
-        'pagination' => [
-            'current_page' => $orders->currentPage(),
-            'per_page' => $orders->perPage(),
-            'total' => $orders->total(),
-            'last_page' => $orders->lastPage(),
-            'from' => $orders->firstItem(),
-            'to' => $orders->lastItem(),
-            'has_more_pages' => $orders->hasMorePages(),
-        ]
-    ];
-
-    return $this->successResponse($responseData, 'Orders index fetched successfully');
-}
 
     public function show(Order $order): JsonResponse
     {
@@ -431,7 +476,7 @@ class OrderController extends Controller
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
 
-   
+
     private function combinations(array $items, int $k): array
     {
         $results = [];
@@ -495,4 +540,21 @@ class OrderController extends Controller
         return (int) ceil($minutes / $step) * $step;
     }
 
+    // جوجل- دالة موحّدة تحل محل تكرار hasOverlap في store() و getAvailableSlots()
+    // تستخدم effective end time (end_time + travel_buffer_minutes) بدل end_time فقط،
+    // لكلا الطرفين: الطلب الموجود مسبقاً في القاعدة، والطلب/الـ slot الجديد المطلوب فحصه.
+    private function isWorkerAvailable(User $worker, Carbon $newStart, Carbon $newEffectiveEnd): bool
+    {
+        $conflict = Order::where('status', '!=', 'canceled')
+            ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
+                $q->where('users.id', $worker->id);
+            })
+            // جوجل- الطلب الموجود يبدأ قبل نهاية الطلب الجديد الفعلية
+            ->where('start_time', '<', $newEffectiveEnd)
+            // جوجل- نهاية الطلب الموجود الفعلية (end_time + travel_buffer_minutes) تقع بعد بداية الطلب الجديد
+            ->whereRaw('DATE_ADD(end_time, INTERVAL travel_buffer_minutes MINUTE) > ?', [$newStart])
+            ->exists();
+
+        return !$conflict;
+    }
 }
