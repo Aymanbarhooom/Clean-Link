@@ -111,6 +111,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/services', [AdminController::class, 'searchServices']);
     });
 
+    Route::prefix('admin/users')->group(function () {
+        Route::get('/clients', [AdminController::class, 'getClients']);
+        Route::get('/workers', [AdminController::class, 'getWorkers']);
+        Route::get('/clients/{user}', [AdminController::class, 'showClient']);
+        Route::get('/workers/{user}', [AdminController::class, 'showWorker']);
+        Route::delete('/{user}', [AdminController::class, 'deleteUser']);
+    });
+
     Route::prefix('profile')->group(function () {
         Route::get('/', [ProfileController::class, 'show']);
         Route::post('/', [ProfileController::class, 'update']);

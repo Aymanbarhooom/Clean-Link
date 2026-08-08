@@ -36,6 +36,6 @@ class CompanyPolicy
 
     public function delete(User $user, Company $company): bool
     {
-        return $user->isAdmin() || ($user->role === 'region_manager' && $user->id === $company->region->manager_id);
+        return $user->isAdmin();
     }
 }

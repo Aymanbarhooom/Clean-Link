@@ -30,7 +30,7 @@ class ServiceController extends Controller
     $user = auth()->user();
     $perPage = $request->get('per_page', 6);
     
-    $query = Service::with(['company.region']);
+    $query = Service::with(['company.region','category']);
 
     // Allow conditional filtering by company context if passed by the frontend
     if ($request->has('company_id')) {
@@ -67,7 +67,7 @@ class ServiceController extends Controller
     {
         $service->load([
             'company', 
-           // 'category',
+             'category',
             'packages', 
             'attributes',
             'reviews.client.profile',
