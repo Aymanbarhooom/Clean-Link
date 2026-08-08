@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Location;
 use App\Models\Profile;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -36,21 +37,39 @@ class ProfileController extends Controller
      */
     public function update(Request $request): JsonResponse
     {
-        // Get the authenticated user's profile or create a new one if it doesn't exist
         $profile = auth()->user()->profile()->firstOrCreate(['user_id' => auth()->id()]);
 
-        // Validate the incoming request data
         $validated = $request->validate([
-            'address' => 'nullable|regex:/^[a-zA-Z0-9\s\-_]+$/|max:500',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'phone' => 'nullable|regex:/^[0-9\s\-\(\)]+$/|max:30',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
-        if($request->hasFile('image')) {
+
+        if ($request->hasFile('image')) {
             $path = $request->file('image')->store('worker_profiles', 'public');
             $validated['image'] = $path;
         }
 
-        // Update the profile with validated data
+        if (array_key_exists('latitude', $validated) || array_key_exists('longitude', $validated)) {
+            $latitude = $validated['latitude'] ?? $profile->latitude ?? null;
+            $longitude = $validated['longitude'] ?? $profile->longitude ?? null;
+
+            if ($latitude !== null && $longitude !== null) {
+                $formattedAddress = sprintf('%.6f, %.6f', (float) $latitude, (float) $longitude);
+                $validated['address'] = $formattedAddress;
+
+                auth()->user()->locations()->updateOrCreate(
+                    ['name' => 'Home'],
+                    [
+                        'name' => 'Home',
+                        'latitude' => $latitude,
+                        'longitude' => $longitude,
+                    ]
+                );
+            }
+        }
+
         $profile->update($validated);
 
         return $this->successResponse($profile, 'User metadata parameters modified successfully');

@@ -12,6 +12,7 @@ use App\Http\Controllers\ComplaintController;
 use App\Http\Controllers\ComplaintResponseController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
@@ -228,4 +229,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/{response}', [ComplaintResponseController::class, 'update']);
         Route::delete('/{response}', [ComplaintResponseController::class, 'destroy']);
     });
+
+    Route::apiResource('locations', LocationController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 });
