@@ -97,4 +97,9 @@ class User extends Authenticatable
         return $this->hasMany(Complaint::class, 'client_id');
     }
     
+    //locations
+    public function locations(): HasMany
+    {
+        return $this->hasMany(Location::class);
+    }
 }
