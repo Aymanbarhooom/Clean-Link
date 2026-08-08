@@ -38,6 +38,7 @@ class ServiceResource extends JsonResource
         'images' => ServiceImageResource::collection($this->whenLoaded('images')), 
         'reviews' => $this->whenLoaded('reviews'),
         'requiredskills' => SkillResource::collection($this->whenLoaded('requiredSkills')),
+        'category' => new CategoryResource($this->whenLoaded('category')),
 
         'created_at' => $this->created_at,
         'updated_at' => $this->updated_at,

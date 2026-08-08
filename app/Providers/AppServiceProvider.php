@@ -12,6 +12,7 @@ use App\Observers\CompanyObserver;
 use App\Observers\ImageObserver;
 use App\Observers\RegionObserver;
 use App\Observers\ServiceObserver;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -34,5 +35,9 @@ class AppServiceProvider extends ServiceProvider
         ServiceImage::observe(ImageObserver::class);
         Region::observe(RegionObserver::class);
         Company::observe(CompanyObserver::class);
+
+        Carbon::serializeUsing(function ($date) {
+            return $date->timezone(config('app.timezone'))->format('Y-m-d\TH:i:sP');
+        });
     }
 }
