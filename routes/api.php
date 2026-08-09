@@ -185,6 +185,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get('packages/{package}/available-slots', [OrderController::class, 'getAvailableSlots']);
+    Route::post('packages/{package}/open-package/check-price', [OrderController::class, 'checkPrice']);
+    Route::post('packages/{package}/open-package/available-slots', [OrderController::class, 'getAvailableSlotsForOpenPackage']);
+    Route::post('orders/open-package', [OrderController::class, 'bookOpenPackage']);
     Route::post('orders', [OrderController::class, 'store']);
     Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
     // ==========================================

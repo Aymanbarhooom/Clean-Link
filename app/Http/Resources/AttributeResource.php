@@ -20,6 +20,8 @@ class AttributeResource extends JsonResource
             'id' => $this->id,
             'name' => $this->{"name_$lang"},
             'type' => $this->type,
+            'price' => $this->whenPivotLoaded('attribute_service', fn () => (float) $this->pivot->price),
+            'duration' => $this->whenPivotLoaded('attribute_service', fn () => $this->pivot->duration),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

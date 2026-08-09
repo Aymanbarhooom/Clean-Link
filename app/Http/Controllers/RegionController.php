@@ -105,53 +105,77 @@ class RegionController extends Controller
     }
 
     public function getRegions(Request $request): JsonResponse
-    {
-        $user = auth()->user();
-        $perPage = $request->get('per_page', 6);
+{
+    $user = auth()->user();
+    $perPage = $request->get('per_page', 6);
 
-        // تبسيط شروط الوصول
-        if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
-            return $this->errorResponse('Access mapping blocked', 403);
-        }
-
-        // بناء الـ Query بناءً على دور المستخدم
-        if ($user->isAdmin() || $user->role === 'client') {
-            $cacheKey = 'all_regions_with_managers_paginated_' . $perPage . '_page_' . $request->get('page', 1);
-
-            $regions = Cache::remember($cacheKey, now()->addDay(), function () use ($perPage) {
-                return Region::with('manager')
-                    ->orderBy('id', 'asc')
-                    ->paginate($perPage);
-            });
-        } elseif ($user->role === 'region_manager') {
-            $cacheKey = 'regions_for_manager_' . $user->id . '_paginated_' . $perPage . '_page_' . $request->get('page', 1);
-
-            $regions = Cache::remember($cacheKey, now()->addDay(), function () use ($user, $perPage) {
-                return Region::where('manager_id', $user->id)
-                    ->with('manager')
-                    ->orderBy('id', 'asc')
-                    ->paginate($perPage);
-            });
-        }
-
-        // تجهيز الـ Response حسب دور المستخدم
-        $responseData = [
-            'data' => ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager())
-                ? $regions->items()
-                : RegionResource::collection($regions->items()),
-            'pagination' => [
-                'current_page' => $regions->currentPage(),
-                'per_page' => $regions->perPage(),
-                'total' => $regions->total(),
-                'last_page' => $regions->lastPage(),
-                'from' => $regions->firstItem(),
-                'to' => $regions->lastItem(),
-                'has_more_pages' => $regions->hasMorePages(),
-            ]
-        ];
-
-        return $this->successResponse($responseData, 'Regions context retrieved');
+    // تبسيط شروط الوصول
+    if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
+        return $this->errorResponse('Access mapping blocked', 403);
     }
+
+    // بناء الـ Query بناءً على دور المستخدم
+    if ($user->isAdmin() || $user->role === 'client') {
+        // 🔥 استخدام مفتاح واحد فقط بدلاً من مفاتيح متعددة لكل صفحة
+        $cacheKey = 'all_regions_with_managers_all';
+        
+        $allRegions = Cache::remember($cacheKey, now()->addDay(), function () {
+            return Region::with('manager')
+                ->orderBy('id', 'asc')
+                ->get();
+        });
+        
+        // تطبيق التقسيم يدوياً
+        $currentPage = $request->get('page', 1);
+        $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
+        
+    } elseif ($user->role === 'region_manager') {
+        $cacheKey = 'regions_for_manager_' . $user->id . '_all';
+        
+        $allRegions = Cache::remember($cacheKey, now()->addDay(), function () use ($user) {
+            return Region::where('manager_id', $user->id)
+                ->with('manager')
+                ->orderBy('id', 'asc')
+                ->get();
+        });
+        
+        // تطبيق التقسيم يدوياً
+        $currentPage = $request->get('page', 1);
+        $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
+    }
+
+    // تجهيز الـ Response
+    $responseData = [
+        'data' => $paginated->items(),
+        'pagination' => [
+            'current_page' => $paginated->currentPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+            'last_page' => $paginated->lastPage(),
+            'from' => $paginated->firstItem(),
+            'to' => $paginated->lastItem(),
+            'has_more_pages' => $paginated->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Regions context retrieved');
+}
+
+/**
+ * تحويل Collection إلى Paginator يدوياً
+ */
+protected function paginateCollection($collection, int $perPage, int $currentPage)
+{
+    $items = $collection->forPage($currentPage, $perPage);
+    
+    return new \Illuminate\Pagination\LengthAwarePaginator(
+        $items->values(),
+        $collection->count(),
+        $perPage,
+        $currentPage,
+        ['path' => request()->url()]
+    );
+}
 
     public function showRegion(Region $region): JsonResponse
     {

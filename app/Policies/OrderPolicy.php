@@ -50,6 +50,6 @@ class OrderPolicy
      */
     public function cancel(User $user, Order $order): bool
     {
-        return $user->role === 'client' && $user->id === $order->client_id && $order->status === 'pending';
+        return $user->role === 'client' && $user->id === $order->client_id && ($order->status === 'pending' || $order->status === 'assigned_to_worker');
     }
 }

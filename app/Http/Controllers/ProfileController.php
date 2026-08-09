@@ -42,6 +42,7 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'address' => 'nullable|string|max:255',
             'phone' => 'nullable|regex:/^[0-9\s\-\(\)]+$/|max:30',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
@@ -65,6 +66,7 @@ class ProfileController extends Controller
                         'name' => 'Home',
                         'latitude' => $latitude,
                         'longitude' => $longitude,
+                        'address' => $formattedAddress,
                     ]
                 );
             }

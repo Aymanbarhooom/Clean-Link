@@ -296,62 +296,89 @@ public function searchServices(Request $request): JsonResponse
     return $this->successResponse($responseData, 'Services search completed');
 }
 
-    public function getClients(Request $request): JsonResponse
-    {
-        $user = auth()->user();
+   public function getClients(Request $request): JsonResponse
+{
+    $user = auth()->user();
 
-        if (!$user?->isAdmin()) {
-            return $this->errorResponse('Access restricted to administrators only', 403);
-        }
-
-        $query = trim((string) $request->input('query', ''));
-
-        $clients = User::query()
-            ->where('role', 'client')
-            ->when($query !== '', function ($builder) use ($query) {
-                $builder->where(function ($subQuery) use ($query) {
-                    $subQuery->where('fullname', 'like', "%{$query}%")
-                        ->orWhere('email', 'like', "%{$query}%");
-                });
-            })
-            ->with(['profile'])
-            ->orderBy('fullname')
-            ->get();
-
-        return $this->successResponse($clients, 'Clients fetched successfully');
+    if (!$user?->isAdmin()) {
+        return $this->errorResponse('Access restricted to administrators only', 403);
     }
 
-    public function getWorkers(Request $request): JsonResponse
-    {
-        $user = auth()->user();
+    $perPage = $request->get('per_page', 10);
+    $query = trim((string) $request->input('query', ''));
 
-        if (!$user?->isAdmin() && !$user?->isCompanyManager()) {
-            return $this->errorResponse('Access restricted to administrators or company managers', 403);
-        }
+    $clients = User::query()
+        ->where('role', 'client')
+        ->when($query !== '', function ($builder) use ($query) {
+            $builder->where(function ($subQuery) use ($query) {
+                $subQuery->where('fullname', 'like', "%{$query}%")
+                    ->orWhere('email', 'like', "%{$query}%");
+            });
+        })
+        ->with(['profile'])
+        ->orderBy('fullname')
+        ->paginate($perPage);
 
-        $query = trim((string) $request->input('query', ''));
+    $responseData = [
+        'data' => $clients->items(),
+        'pagination' => [
+            'current_page' => $clients->currentPage(),
+            'per_page' => $clients->perPage(),
+            'total' => $clients->total(),
+            'last_page' => $clients->lastPage(),
+            'from' => $clients->firstItem(),
+            'to' => $clients->lastItem(),
+            'has_more_pages' => $clients->hasMorePages(),
+        ]
+    ];
 
-        $workers = User::query()
-            ->where('role', 'worker')
-            ->when($query !== '', function ($builder) use ($query) {
-                $builder->where(function ($subQuery) use ($query) {
-                    $subQuery->where('fullname', 'like', "%{$query}%")
-                        ->orWhere('email', 'like', "%{$query}%");
-                });
-            })
-            ->with(['profile', 'workerProfile.company'])
-            ->when($user->isCompanyManager(), function ($builder) use ($user) {
-                $companyIds = $user->managedCompanies()->pluck('companies.id');
-                $builder->whereHas('workerProfile', function ($workerQuery) use ($companyIds) {
-                    $workerQuery->whereIn('company_id', $companyIds);
-                });
-            })
-            ->orderBy('fullname')
-            ->get();
+    return $this->successResponse($responseData, 'Clients fetched successfully');
+}
 
-        return $this->successResponse($workers, 'Workers fetched successfully');
+public function getWorkers(Request $request): JsonResponse
+{
+    $user = auth()->user();
+
+    if (!$user?->isAdmin() && !$user?->isCompanyManager()) {
+        return $this->errorResponse('Access restricted to administrators or company managers', 403);
     }
 
+    $perPage = $request->get('per_page', 10);
+    $query = trim((string) $request->input('query', ''));
+
+    $workers = User::query()
+        ->where('role', 'worker')
+        ->when($query !== '', function ($builder) use ($query) {
+            $builder->where(function ($subQuery) use ($query) {
+                $subQuery->where('fullname', 'like', "%{$query}%")
+                    ->orWhere('email', 'like', "%{$query}%");
+            });
+        })
+        ->with(['profile', 'workerProfile.company'])
+        ->when($user->isCompanyManager(), function ($builder) use ($user) {
+            $companyIds = $user->managedCompanies()->pluck('companies.id');
+            $builder->whereHas('workerProfile', function ($workerQuery) use ($companyIds) {
+                $workerQuery->whereIn('company_id', $companyIds);
+            });
+        })
+        ->orderBy('fullname')
+        ->paginate($perPage);
+
+    $responseData = [
+        'data' => $workers->items(),
+        'pagination' => [
+            'current_page' => $workers->currentPage(),
+            'per_page' => $workers->perPage(),
+            'total' => $workers->total(),
+            'last_page' => $workers->lastPage(),
+            'from' => $workers->firstItem(),
+            'to' => $workers->lastItem(),
+            'has_more_pages' => $workers->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Workers fetched successfully');
+}
     public function showClient(User $user): JsonResponse
     {
         if (!auth()->user()?->isAdmin()) {
@@ -361,8 +388,9 @@ public function searchServices(Request $request): JsonResponse
         if ($user->role !== 'client') {
             return $this->errorResponse('Requested user is not a client', 404);
         }
+        $number_of_orders = $user->orders()->count();
 
-        return $this->successResponse($user->load(['profile']), 'Client details fetched successfully');
+        return $this->successResponse([$user->load(['profile']), 'number_of_orders' => $number_of_orders], 'Client details fetched successfully');
     }
 
     public function showWorker(User $user): JsonResponse
