@@ -10,6 +10,7 @@ class Package extends Model
 {
     protected $fillable = ['service_id', 'name_ar', 'name_en', 'duration', 'price','price_after_discount', 'details_ar', 'details_en', 'minimum_workers'];
 
+    protected $appends = ['is_open_package'];
     /**
      * Automatic JSON casting conversion for array structures.
      */
@@ -30,5 +31,10 @@ class Package extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function getIsOpenPackageAttribute(): bool
+    {
+        return $this->name_en === 'Open Package';
     }
 }
