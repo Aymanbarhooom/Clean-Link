@@ -37,6 +37,7 @@ class LocationController extends Controller
         $location = Location::create([
             'user_id' => Auth::id(),
             'name' => $validated['name'] ?? 'Home',
+            'address' => $validated['address'] ?? '',
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
         ]);
