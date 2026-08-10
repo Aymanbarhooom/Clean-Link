@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
 
 class OrderResource extends JsonResource
 {
@@ -33,7 +34,39 @@ class OrderResource extends JsonResource
             'client' => $this->whenLoaded('client'),
             'leader' => $this->getLeaderResource(),
             'package' => new PackageResource($this->package),
-            'attributes' => AttributeResource::collection($this->whenLoaded('attributes')),
+            'attributes' => $this->whenLoaded('attributes', function () use ($request) {
+                $lang = $request->header('Accept-Language', 'ar');
+                $serviceId = $this->package?->service?->id;
+
+                return $this->attributes->map(function ($attr) use ($lang, $serviceId) {
+                    $qty = $attr->pivot->qty ?? $attr->pivot->quantity ?? null;
+
+                    $price = null;
+                    $duration = null;
+                    if ($serviceId) {
+                        $row = DB::table('attribute_service')
+                            ->where('attribute_id', $attr->id)
+                            ->where('service_id', $serviceId)
+                            ->first();
+
+                        if ($row) {
+                            $price = (float) $row->price;
+                            $duration = (int) $row->duration;
+                        }
+                    }
+
+                    return [
+                        'id' => $attr->id,
+                        'name' => $attr->{"name_$lang"} ?? $attr->name_en ?? $attr->name_ar,
+                        'type' => $attr->type,
+                        'price' => $price,
+                        'duration' => $duration,
+                        'qty' => $qty,
+                        'created_at' => $attr->created_at,
+                        'updated_at' => $attr->updated_at,
+                    ];
+                })->values();
+            }),
         ];
     }
 
