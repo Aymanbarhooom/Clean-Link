@@ -12,7 +12,10 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        Schedule::command('orders:cancel-pending')
+            ->everyThirtyMinutes()  // ينفذ كل نصف ساعة
+            ->withoutOverlapping()  // يمنع التشغيل المتزامن لمهمات طويلة
+            ->runInBackground();
     }
 
     /**
@@ -20,7 +23,7 @@ class Kernel extends ConsoleKernel
      */
     protected function commands(): void
     {
-        $this->load(__DIR__.'/Commands');
+        $this->load(__DIR__ . '/Commands');
 
         require base_path('routes/console.php');
     }
