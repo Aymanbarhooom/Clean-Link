@@ -35,9 +35,9 @@ class AppServiceProvider extends ServiceProvider
         ServiceImage::observe(ImageObserver::class);
         Region::observe(RegionObserver::class);
         Company::observe(CompanyObserver::class);
-
         Carbon::serializeUsing(function ($date) {
             return $date->timezone(config('app.timezone'))->format('Y-m-d\TH:i:sP');
         });
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
     }
 }

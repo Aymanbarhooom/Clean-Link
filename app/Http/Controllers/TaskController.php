@@ -59,135 +59,151 @@ class TaskController extends Controller
     }
 
     public function updateStatus(Request $request, Task $task): JsonResponse
-{
-    $user = auth()->user();
-    $workers = $task->workgroup->workers;
+    {
+        $user = auth()->user();
+        $workers = $task->workgroup->workers;
 
-    // 1. FIXED: Correctly load the order's specific client and their FCM tokens
-    $order = $task->order;
-    $client = $order->client;
-    $client->load('fcmTokens'); 
+        // 1. FIXED: Correctly load the order's specific client and their FCM tokens
+        $order = $task->order;
+        $client = $order->client;
+        $client->load('fcmTokens');
 
-    if ($task->workgroup->leader_id !== $user->id) {
-        return $this->errorResponse('Access Denied. Only the Workgroup Leader can modify task status or upload tracking photos.', 403);
-    }
-
-    $validated = $request->validate([
-        'status' => 'required|in:pending,on_way,handling,done',
-        'image_before' => 'nullable|image|max:2048', // 2MB
-        'image_after' => 'nullable|image|max:2048', // 2MB
-    ]);
-
-    if ($request->hasFile('image_before')) {
-        $validated['image_before'] = $request->file('image_before')->store('task_images', 'public');
-    }
-    if ($request->hasFile('image_after')) {
-        $validated['image_after'] = $request->file('image_after')->store('task_images', 'public');
-    }
-
-    $task->update(array_filter($validated));
-
-    $doneNotifications = [
-        'ar' => [
-            'title' => 'تم الانتهاء من الطلب',
-            'body' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
-            'status' => 'مكتملة',
-        ],
-        'en' => [
-            'title' => 'Order Completed',
-            'body' => "Your order #{$order->id} has been completed. Thank you for using our services.",
-            'status' => 'completed',
-        ]
-    ];
-
-    $handlingNotifications = [
-        'ar' => [
-            'title' => 'طلبك قيد المعالجة',
-            'body' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
-            'status' => 'قيد المعالجة',
-        ],
-        'en' => [
-            'title' => 'Order in Process',
-            'body' => "Your order #{$order->id} is now in process. Thank you for using our services.",
-            'status' => 'in_process',
-        ]
-    ];
-
-    if ($validated['status'] === 'done') {
-        $task->advanceStatus('done');
-        $order->update(['status' => 'completed']);
-
-        foreach ($workers as $worker) {
-            $worker->workerProfile->status = 'available';
-            $worker->workerProfile->save();
+        if ($task->workgroup->leader_id !== $user->id) {
+            return $this->errorResponse('Access Denied. Only the Workgroup Leader can modify task status or upload tracking photos.', 403);
         }
-        $client->notifications()->create([
-            'title_ar' => 'تم الانتهاء من الطلب',
-            'body_ar' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
-            'title_en' => 'Order Completed',
-            'body_en' => "Your order #{$order->id} has been completed. Thank you for using our services.",
-            'is_read' => false,
-            'data'=>[
-                'type'=> 'order_status_changed',
-                'order_id' => $order->id,
-                'status' => 'completed',
-            ]
+
+        $validated = $request->validate([
+            'status' => 'required|in:pending,on_way,handling,done',
+            'image_before' => 'nullable|image|max:2048', // 2MB
+            'image_after' => 'nullable|image|max:2048', // 2MB
         ]);
 
-        foreach ($client->fcmTokens as $token) {
-            $notificationTitle = $doneNotifications[$token->lang]['title'] ?? $doneNotifications['en']['title'];
-            $notificationBody = $doneNotifications[$token->lang]['body'] ?? $doneNotifications['en']['body'];
-            app(FirebaseNotificationService::class)->sendPushNotification(
-                $token->token,
-                $notificationTitle,
-                $notificationBody,
-                [
-                    'notification_id' => $client->notifications()->latest()->first()->id,
-                    'type'=> 'order_status_changed',
+        if ($request->hasFile('image_before')) {
+            $validated['image_before'] = $request->file('image_before')->store('task_images', 'public');
+        }
+        if ($request->hasFile('image_after')) {
+            $validated['image_after'] = $request->file('image_after')->store('task_images', 'public');
+        }
+
+        $task->update(array_filter($validated));
+
+        $doneNotifications = [
+            'ar' => [
+                'title' => 'تم الانتهاء من الطلب',
+                'body' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
+                'status' => 'مكتملة',
+            ],
+            'en' => [
+                'title' => 'Order Completed',
+                'body' => "Your order #{$order->id} has been completed. Thank you for using our services.",
+                'status' => 'completed',
+            ]
+        ];
+
+        $handlingNotifications = [
+            'ar' => [
+                'title' => 'طلبك قيد المعالجة',
+                'body' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
+                'status' => 'قيد المعالجة',
+            ],
+            'en' => [
+                'title' => 'Order in Process',
+                'body' => "Your order #{$order->id} is now in process. Thank you for using our services.",
+                'status' => 'in_process',
+            ]
+        ];
+
+        if ($validated['status'] === 'done') {
+            $task->advanceStatus('done');
+            $order->update(['status' => 'completed']);
+
+            foreach ($workers as $worker) {
+                $worker->workerProfile->status = 'available';
+                $worker->workerProfile->save();
+            }
+            $client->notifications()->create([
+                'title_ar' => 'تم الانتهاء من الطلب',
+                'body_ar' => "تم الانتهاء من طلبك رقم #{$order->id}. شكرًا لاستخدامك خدماتنا.",
+                'title_en' => 'Order Completed',
+                'body_en' => "Your order #{$order->id} has been completed. Thank you for using our services.",
+                'is_read' => false,
+                'data' => [
+                    'type' => 'order_status_changed',
                     'order_id' => $order->id,
                     'status' => 'completed',
                 ]
-            );
+            ]);
+
+            foreach ($client->fcmTokens as $token) {
+                $notificationTitle = $doneNotifications[$token->lang]['title'] ?? $doneNotifications['en']['title'];
+                $notificationBody = $doneNotifications[$token->lang]['body'] ?? $doneNotifications['en']['body'];
+                app(FirebaseNotificationService::class)->sendPushNotification(
+                    $token->token,
+                    $notificationTitle,
+                    $notificationBody,
+                    [
+                        'notification_id' => $client->notifications()->latest()->first()->id,
+                        'type' => 'order_status_changed',
+                        'order_id' => $order->id,
+                        'status' => 'completed',
+                    ]
+                );
+            }
         }
 
-    }
-
-    if ($validated['status'] === 'handling') {
-        $client->notifications()->create([
-            'title_ar' => 'طلبك قيد المعالجة',
-            'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
-            'title_en' => 'Order in Process',
-            'body_en' => "Your order #{$order->id} is now in process. Thank you for using our services.",
-            'is_read' => false,
-            'data'=>[
-                'type'=> 'order_status_changed',
-                'order_id' => $order->id,
-                'status' => 'in_process',
-            ]
-        ]);
-
-        $order->update(['status' => 'in_process']);
-
-        foreach ($client->fcmTokens as $token) {
-            $notificationTitle = $handlingNotifications[$token->lang]['title'] ?? $handlingNotifications['en']['title'];
-            $notificationBody = $handlingNotifications[$token->lang]['body'] ?? $handlingNotifications['en']['body'];
-            app(FirebaseNotificationService::class)->sendPushNotification(
-                $token->token,
-                $notificationTitle,
-                $notificationBody,
-                [
-                    'notification_id' => $client->notifications()->latest()->first()->id,
-                    'type'=> 'order_status_changed',
+        if ($validated['status'] === 'handling') {
+            $client->notifications()->create([
+                'title_ar' => 'طلبك قيد المعالجة',
+                'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
+                'title_en' => 'Order in Process',
+                'body_en' => "Your order #{$order->id} is now in process. Thank you for using our services.",
+                'is_read' => false,
+                'data' => [
+                    'type' => 'order_status_changed',
                     'order_id' => $order->id,
                     'status' => 'in_process',
                 ]
-            );
+            ]);
+
+            // دفع- حساب التوزيع 10%/90% عند دخول الطلب in_process (لكلا نوعي الدفع)
+            $order->calculateAndSetPaymentShares();
+
+            // دفع- تحصيل المبلغ فعلياً فقط لو كان الدفع electric ومحجوزاً مسبقاً
+            if ($order->payment_method === 'electric' && $order->payment_status === 'held') {
+                try {
+                    \Stripe\PaymentIntent::retrieve($order->stripe_payment_intent_id)->capture();
+                    $order->update(['payment_status' => 'captured']);
+                } catch (\Exception $e) {
+                    \Log::error('Stripe PaymentIntent capture failed', [
+                        'order_id' => $order->id,
+                        'message' => $e->getMessage(),
+                    ]);
+                    // دفع- لا نمنع تقدم حالة الطلب بسبب فشل تحصيل الدفع، لكن نسجل الخطأ للمراجعة اليدوية
+                    // قد ترغب لاحقاً بإشعار الأدمن تلقائياً هنا بدل الاكتفاء بالـ log
+                }
+            }
+
+            $order->update(['status' => 'in_process']);
+
+            foreach ($client->fcmTokens as $token) {
+                $notificationTitle = $handlingNotifications[$token->lang]['title'] ?? $handlingNotifications['en']['title'];
+                $notificationBody = $handlingNotifications[$token->lang]['body'] ?? $handlingNotifications['en']['body'];
+                app(FirebaseNotificationService::class)->sendPushNotification(
+                    $token->token,
+                    $notificationTitle,
+                    $notificationBody,
+                    [
+                        'notification_id' => $client->notifications()->latest()->first()->id,
+                        'type' => 'order_status_changed',
+                        'order_id' => $order->id,
+                        'status' => 'in_process',
+                    ]
+                );
+            }
         }
 
+        $task->load(['order.package.service', 'workgroup.leader']);
+
+        return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
     }
-
-    $task->load(['order.package.service', 'workgroup.leader']);
-
-    return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
-}
 }

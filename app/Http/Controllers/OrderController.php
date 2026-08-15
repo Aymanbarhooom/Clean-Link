@@ -361,6 +361,9 @@ class OrderController extends Controller
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
+
+            // Payment
+            'payment_method' => 'required|in:electric,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -417,7 +420,17 @@ class OrderController extends Controller
                 'travel_buffer_minutes' => $travelBufferMinutes,
                 'status' => 'pending',
                 'total_price' => $totals['total_price'],
+
+                // Payment
+                'payment_method' => $validated['payment_method'],
+                'payment_status' => $validated['payment_method'] === 'electric'
+                    ? 'pending'
+                    : 'held',
+                'is_done_with_admin' => false,
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
+
+            $order->calculateAndSetPaymentShares();
 
             if (!empty($pivotPayload)) {
                 $order->attributes()->attach($pivotPayload);
@@ -544,10 +557,10 @@ class OrderController extends Controller
             new OrderResource($order),
             'Open Package booking submitted and placed under review successfully',
             211
-        ); 
+        );
     }
 
-    public function store(Request $request,  GoogleRoutesService $routesService): JsonResponse
+    public function store(Request $request, GoogleRoutesService $routesService): JsonResponse
     {
         if (auth()->user()->role !== 'client') {
             return $this->errorResponse('Access restricted to registered customer accounts', 403);
@@ -560,9 +573,9 @@ class OrderController extends Controller
             'longitude' => 'required|numeric',
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
-            'attributes' => 'nullable|array',
-            'attributes.*.id' => 'required|exists:attributes,id',
-            'attributes.*.qty' => 'required|integer|min:1',
+
+            // Payment
+            'payment_method' => 'required|in:electric,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -573,7 +586,7 @@ class OrderController extends Controller
             return $this->errorResponse('Company location is not configured yet', 422);
         }
 
-        // جوجل- حساب زمن التنقل ذهاباً فقط عبر الخدمة
+        // جوجل - حساب زمن التنقل ذهاباً فقط عبر الخدمة
         $oneWayMinutes = $routesService->calculateDrivingRoute(
             $company->latitude,
             $company->longitude,
@@ -581,7 +594,7 @@ class OrderController extends Controller
             $validated['longitude']
         );
 
-        // جوجل- فشل صريح بدل الابتلاع الصامت (بعكس نمط try/catch الموجود لاحقاً في التعيين التلقائي)
+        // جوجل - فشل صريح بدل الابتلاع الصامت
         if (is_null($oneWayMinutes)) {
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
@@ -593,55 +606,82 @@ class OrderController extends Controller
             $request->start_time,
             'Asia/Riyadh'
         );
+
         $baseDuration = (int) $package->duration;
         $basePrice = $package->price_after_discount ?? $package->price;
 
         $attributeCalculationItems = [];
         $pivotPayload = [];
 
-        if (!empty($validated['attributes'])) {
-            if ($package->name_en !== 'Open Package') {
-                return $this->errorResponse('Attributes can be added only to the Open Package', 422);
-            }
-            foreach ($validated['attributes'] as $item) {
-                $serviceAttributePivot = $service->attributes()->where('attributes.id', $item['id'])->first();
-                $priceAtOrder = $serviceAttributePivot ? (float) $serviceAttributePivot->pivot->price : 0.00;
-                $durationAtOrder = $serviceAttributePivot ? (int) $serviceAttributePivot->pivot->duration : 0;
+        $attributeTotals = $this->calculateAttributeTotals(
+            $attributeCalculationItems,
+            $basePrice,
+            $baseDuration
+        );
 
-                $pivotPayload[$item['id']] = [
-                    'qty' => $item['qty'],
-                    'price_at_order' => $priceAtOrder,
-                ];
-
-                $attributeCalculationItems[] = [
-                    'qty' => $item['qty'],
-                    'price' => $priceAtOrder,
-                    'duration' => $durationAtOrder,
-                ];
-            }
-        }
-
-        $attributeTotals = $this->calculateAttributeTotals($attributeCalculationItems, $basePrice, $baseDuration);
         $totalDuration = $attributeTotals['duration'];
+
         $endTime = $startTime->copy()->addMinutes($totalDuration);
+
         $effectiveEndTime = $endTime->copy()->addMinutes($travelBufferMinutes);
+
         $totalDuration += $travelBufferMinutes;
 
-        $order = DB::transaction(function () use ($effectiveEndTime, $travelBufferMinutes, $validated, $package, $service, $startTime, $endTime, $totalDuration, $attributeTotals, $pivotPayload) {
+        /*
+    |--------------------------------------------------------------------------
+    | Create Order
+    |--------------------------------------------------------------------------
+    */
+
+        $order = DB::transaction(function () use (
+            $effectiveEndTime,
+            $travelBufferMinutes,
+            $validated,
+            $package,
+            $service,
+            $startTime,
+            $endTime,
+            $totalDuration,
+            $attributeTotals,
+            $pivotPayload
+        ) {
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
+
                 'location' => $validated['location'],
                 'latitude' => $validated['latitude'],
                 'longitude' => $validated['longitude'],
                 'note' => $validated['note'] ?? null,
+
                 'start_time' => $startTime,
                 'end_time' => $effectiveEndTime,
                 'duration' => $totalDuration,
                 'travel_buffer_minutes' => $travelBufferMinutes,
+
                 'status' => 'pending',
+
                 'total_price' => $attributeTotals['total_price'],
+
+                // Payment
+                'payment_method' => $validated['payment_method'],
+
+                'payment_status' => $validated['payment_method'] === 'electric'
+                    ? 'pending'
+                    : 'held',
+
+                'is_done_with_admin' => false,
+
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
+
+            /*
+        |--------------------------------------------------------------------------
+        | Calculate internal payment shares
+        |--------------------------------------------------------------------------
+        */
+
+            $order->calculateAndSetPaymentShares();
 
             if (!empty($pivotPayload)) {
                 $order->attributes()->attach($pivotPayload);
@@ -656,7 +696,11 @@ class OrderController extends Controller
         try {
             $service = $package->service;
             $company = $service->company;
-            $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
+
+            $requiredSkillIds = $service->requiredSkills()
+                ->pluck('skills.id')
+                ->toArray();
+
             $minimumWorkers = (int) ($package->minimum_workers ?? 1);
 
             $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
@@ -669,9 +713,16 @@ class OrderController extends Controller
                 ->get();
 
             if ($eligibleWorkers->count() >= $minimumWorkers) {
-                $combinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
+
+                $combinations = $this->combinations(
+                    $eligibleWorkers->values()->all(),
+                    $minimumWorkers
+                );
+
                 $found = null;
+
                 foreach ($combinations as $combo) {
+
                     $combined = collect($combo)
                         ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
                         ->flatten()
@@ -683,9 +734,14 @@ class OrderController extends Controller
                     }
 
                     $conflict = false;
+
                     foreach ($combo as $worker) {
-                        // جوجل- استبدال hasOverlap المكرر بالدالة الموحدة، مع effectiveEndTime بدل endTime
-                        if (!$this->isWorkerAvailable($worker, $startTime, $effectiveEndTime)) {
+
+                        if (!$this->isWorkerAvailable(
+                            $worker,
+                            $startTime,
+                            $effectiveEndTime
+                        )) {
                             $conflict = true;
                             break;
                         }
@@ -698,7 +754,11 @@ class OrderController extends Controller
                 }
 
                 if ($found) {
-                    $leader = collect($found)->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)->first();
+
+                    $leader = collect($found)
+                        ->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)
+                        ->first();
+
                     $order->setRelation('leader', $leader);
 
                     $workgroup = Workgroup::create([
@@ -708,15 +768,21 @@ class OrderController extends Controller
                     ]);
 
                     $workerIds = collect($found)->pluck('id')->toArray();
+
                     $workgroup->workers()->attach($workerIds);
 
                     DB::transaction(function () use ($order, $workgroup) {
+
                         $order->tasks()->create([
                             'workgroup_id' => $workgroup->id,
                             'status' => 'pending'
                         ]);
-                        $order->update(['status' => 'assigned_to_worker']);
+
+                        $order->update([
+                            'status' => 'assigned_to_worker'
+                        ]);
                     });
+
                     $newTaskNotifications = [
                         'ar' => [
                             'title' => 'مهمة جديدة تم تعيينها',
@@ -731,6 +797,7 @@ class OrderController extends Controller
                     ];
 
                     foreach ($found as $worker) {
+
                         $notification = $worker->notifications()->create([
                             'title_ar' => 'تم تعيين مهمة جديدة',
                             'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
@@ -744,19 +811,27 @@ class OrderController extends Controller
                         ]);
 
                         foreach ($worker->fcmTokens as $token) {
-                            $notificationTitle = $newTaskNotifications[$token->lang]['title'] ?? $newTaskNotifications['en']['title'];
-                            $notificationBody = $newTaskNotifications[$token->lang]['body'] ?? $newTaskNotifications['en']['body'];
-                            app(FirebaseNotificationService::class)->sendPushNotification(
-                                $token->token,
-                                $notificationTitle,
-                                $notificationBody,
-                                [
-                                    'notification_id' => $notification->id,
-                                    'type' => 'new_task_assigned',
-                                    'order_id' => $order->id,
-                                    'status' => 'assigned_to_worker',
-                                ]
-                            );
+
+                            $notificationTitle =
+                                $newTaskNotifications[$token->lang]['title']
+                                ?? $newTaskNotifications['en']['title'];
+
+                            $notificationBody =
+                                $newTaskNotifications[$token->lang]['body']
+                                ?? $newTaskNotifications['en']['body'];
+
+                            app(FirebaseNotificationService::class)
+                                ->sendPushNotification(
+                                    $token->token,
+                                    $notificationTitle,
+                                    $notificationBody,
+                                    [
+                                        'notification_id' => $notification->id,
+                                        'type' => 'new_task_assigned',
+                                        'order_id' => $order->id,
+                                        'status' => 'assigned_to_worker',
+                                    ]
+                                );
                         }
                     }
                 }
@@ -769,7 +844,7 @@ class OrderController extends Controller
             new OrderResource($order),
             'Booking submitted and placed under review successfully',
             211
-        ); 
+        );
     }
 
 

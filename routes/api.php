@@ -14,6 +14,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\PackageController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\ReviewController;
@@ -234,4 +235,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::apiResource('locations', LocationController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+
+    Route::post(
+        '/payments/create-intent',
+        [PaymentController::class, 'createPaymentIntent']
+    );
 });

@@ -39,4 +39,9 @@ return [
         'routes_api_key' => env('GOOGLE_ROUTES_API_KEY'),
     ],
 
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET_KEY'),
+        'key' => env('STRIPE_PUBLISHABLE_KEY'),
+    ],
+
 ];

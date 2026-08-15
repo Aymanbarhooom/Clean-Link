@@ -21,7 +21,14 @@ class Order extends Model
         'duration',
         'travel_buffer_minutes',
         'status',
-        'total_price'
+        'total_price',
+        'payment_method',
+        'payment_status',
+        'stripe_payment_intent_id',
+        'admin_share',
+        'company_share', 
+        'is_done_with_admin',
+        'is_company_paid',
     ];
 
     protected $casts = [
@@ -31,6 +38,10 @@ class Order extends Model
         'total_price' => 'float',
         'latitude' => 'float',
         'longitude' => 'float',
+        'admin_share' => 'float',
+        'company_share' => 'float',
+        'is_done_with_admin' => 'boolean',
+        'is_company_paid' => 'boolean',
     ];
 
     // --- Relationships ---
@@ -76,4 +87,11 @@ class Order extends Model
     {
         return $this->end_time->copy()->addMinutes($this->travel_buffer_minutes);
     }
+    public function calculateAndSetPaymentShares(): void
+{
+    $this->update([
+        'admin_share' => round($this->total_price * 0.10, 2),
+        'company_share' => round($this->total_price * 0.90, 2),
+    ]);
+}
 }
