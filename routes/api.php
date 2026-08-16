@@ -241,3 +241,6 @@ Route::middleware('auth:sanctum')->group(function () {
         [PaymentController::class, 'createPaymentIntent']
     );
 });
+
+
+Route::post('stripe/webhook', [App\Http\Controllers\StripeWebhookController::class, 'handleWebhook']);
