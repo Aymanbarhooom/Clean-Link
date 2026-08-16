@@ -895,6 +895,12 @@ class OrderController extends Controller
     {
         $this->authorize('viewAny', Order::class);
 
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
+            'payment_status' => ['nullable', 'string', 'in:pending,held,paid,refunded'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
         $user = auth()->user();
         $validated = $request->validate([
             'page' => 'sometimes|integer|min:1',
@@ -917,6 +923,14 @@ class OrderController extends Controller
                         'has_more_pages' => false,
                     ]
                 ], 'No company registered');
+        }
+
+        if (!empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
+        if (!empty($validated['payment_status'])) {
+            $query->where('payment_status', $validated['payment_status']);
         }
 
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
