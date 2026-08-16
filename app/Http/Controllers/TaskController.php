@@ -169,8 +169,8 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'on_way') {
-            if ($task->status !== 'assigned_to_worker') {
-                return $this->errorResponse('Cannot mark this task as on the way. It is not in the assigned_to_worker status.', 422);
+            if ($task->status !== 'pending') {
+                return $this->errorResponse('Cannot mark this task as on the way. It is not in the pending status.', 422);
             }
             if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
                 try {
