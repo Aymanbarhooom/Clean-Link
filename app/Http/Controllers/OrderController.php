@@ -849,21 +849,45 @@ class OrderController extends Controller
 
 
     public function cancel(Order $order): JsonResponse
-    {
-        $user = auth()->user();
-        $this->authorize('cancel', $order);
-        if ($order->status == 'canceled') {
-            return $this->errorResponse('This order has already been canceled', 422);
-        } elseif ($order->status == 'completed' || $order->status == 'in_progress') {
-            return $this->errorResponse('This order cannot be canceled', 422);
-        }
-        $order->update(['status' => 'canceled']);
+{
+    $user = auth()->user();
+    $this->authorize('cancel', $order);
 
-        $order->tasks()->delete();
-        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
-
-        return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
+    if ($order->status == 'canceled') {
+        return $this->errorResponse('This order has already been canceled', 422);
+    } elseif ($order->status == 'completed' || $order->status == 'in_progress') {
+        return $this->errorResponse('This order cannot be canceled', 422);
     }
+
+    // معالجة إلغاء الدفع أو الاسترجاع في Stripe للطلبات الإلكترونية
+    if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
+        try {
+            $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+
+            // 1. إذا كان المبلغ محجوزاً فقط، نلغي الحجز
+            if ($order->payment_status === 'held') {
+                $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
+                $order->update(['payment_status' => 'refunded']);
+            }
+            // 2. إذا كان المبلغ قد اقتُطع بالفعل، نردّه للعميل
+            elseif ($order->payment_status === 'paid') {
+                $stripe->refunds->create([
+                    'payment_intent' => $order->stripe_payment_intent_id,
+                ]);
+                $order->update(['payment_status' => 'refunded']);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Stripe Refund/Cancel Failed for Order #' . $order->id . ': ' . $e->getMessage());
+        }
+    }
+
+    $order->update(['status' => 'canceled']);
+    $order->tasks()->delete();
+
+    $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
+
+    return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
+}
 
     public function index(Request $request): JsonResponse
     {

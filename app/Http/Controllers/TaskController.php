@@ -152,6 +152,26 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'handling') {
+            // 1. معالجة الدفع عبر Stripe إذا كان الطلب إلكتروني والمبلغ محجوز
+            if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
+                try {
+                    $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+
+                    // اقتطاع المبلغ المحجوز فعلياً إلى حساب الأدمن
+                    $stripe->paymentIntents->capture($order->stripe_payment_intent_id);
+
+                    // تحديث حالة الدفع للطلب
+                    $order->update([
+                        'payment_status' => 'paid',
+                        'is_company_paid' => false, // يصبح للشركة مستحقات لدى الأدمن
+                    ]);
+                } catch (\Exception $e) {
+                    // تسجيل الخطأ في اللوغز لضمان متابعته بدون تعطيل تنفيذ التاسك
+                    \Log::error('Stripe Capture Failed for Order #' . $order->id . ': ' . $e->getMessage());
+                }
+            }
+
+            // 2. تحديث حالة الطلب وإرسال الإشعارات (كودك الحالي)
             $client->notifications()->create([
                 'title_ar' => 'طلبك قيد المعالجة',
                 'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
@@ -164,24 +184,6 @@ class TaskController extends Controller
                     'status' => 'in_process',
                 ]
             ]);
-
-            // دفع- حساب التوزيع 10%/90% عند دخول الطلب in_process (لكلا نوعي الدفع)
-            $order->calculateAndSetPaymentShares();
-
-            // دفع- تحصيل المبلغ فعلياً فقط لو كان الدفع electric ومحجوزاً مسبقاً
-            if ($order->payment_method === 'electric' && $order->payment_status === 'held') {
-                try {
-                    \Stripe\PaymentIntent::retrieve($order->stripe_payment_intent_id)->capture();
-                    $order->update(['payment_status' => 'captured']);
-                } catch (\Exception $e) {
-                    \Log::error('Stripe PaymentIntent capture failed', [
-                        'order_id' => $order->id,
-                        'message' => $e->getMessage(),
-                    ]);
-                    // دفع- لا نمنع تقدم حالة الطلب بسبب فشل تحصيل الدفع، لكن نسجل الخطأ للمراجعة اليدوية
-                    // قد ترغب لاحقاً بإشعار الأدمن تلقائياً هنا بدل الاكتفاء بالـ log
-                }
-            }
 
             $order->update(['status' => 'in_process']);
 
