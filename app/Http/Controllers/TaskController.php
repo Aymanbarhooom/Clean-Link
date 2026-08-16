@@ -153,7 +153,7 @@ class TaskController extends Controller
 
         if ($validated['status'] === 'handling') {
             // 1. معالجة الدفع عبر Stripe إذا كان الطلب إلكتروني والمبلغ محجوز
-            if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
+            if ($order->payment_method === 'electric' && $order->payment_status === 'pending' && $order->stripe_payment_intent_id) {
                 try {
                     $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
 
