@@ -127,6 +127,9 @@ class TaskController extends Controller
         ];
 
         if ($validated['status'] === 'done') {
+            if($task->status !== 'handling') {
+                return $this->errorResponse('Cannot mark this task as done. It is not in the handling status.', 422);
+            }
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
             $order->update(['payment_status' => 'paid']);
@@ -166,6 +169,9 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'on_way') {
+            if ($task->status !== 'assigned_to_worker') {
+                return $this->errorResponse('Cannot mark this task as on the way. It is not in the assigned_to_worker status.', 422);
+            }
             if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
                 try {
                     $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
@@ -214,6 +220,9 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'handling') {
+            if ($task->status !== 'on_way') {
+                return $this->errorResponse('Cannot mark this task as handling. It is not in the on_way status.', 422);
+            }
             $client->notifications()->create([
                 'title_ar' => 'طلبك قيد المعالجة',
                 'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
