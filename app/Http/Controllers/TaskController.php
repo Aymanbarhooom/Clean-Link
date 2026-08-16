@@ -113,10 +113,23 @@ class TaskController extends Controller
             ]
         ];
 
+        $onWayNotifications = [
+            'ar' => [
+                'title' => 'طلبك في الطريق',
+                'body' => "طلبك رقم #{$order->id} في الطريق الآن. شكرًا لاستخدامك خدماتنا.",
+                'status' => 'في الطريق',
+            ],
+            'en' => [
+                'title' => 'Your Order Is On the Way',
+                'body' => "Your order #{$order->id} is on the way. Thank you for using our services.",
+                'status' => 'on_way',
+            ]
+        ];
+
         if ($validated['status'] === 'done') {
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
-            $order->update(['payment_status' => 'paid']); // Mark the order as paid when completed
+            $order->update(['payment_status' => 'paid']);
 
             foreach ($workers as $worker) {
                 $worker->workerProfile->status = 'available';
@@ -152,27 +165,55 @@ class TaskController extends Controller
             }
         }
 
-        if ($validated['status'] === 'handling') {
-            // 1. معالجة الدفع عبر Stripe إذا كان الطلب إلكتروني والمبلغ محجوز
-            if ($order->payment_method === 'electric' && $order->payment_status === 'pending' && $order->stripe_payment_intent_id) {
+        if ($validated['status'] === 'on_way') {
+            if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
                 try {
                     $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-
-                    // اقتطاع المبلغ المحجوز فعلياً إلى حساب الأدمن
                     $stripe->paymentIntents->capture($order->stripe_payment_intent_id);
 
-                    // تحديث حالة الدفع للطلب
                     $order->update([
                         'payment_status' => 'paid',
-                        'is_company_paid' => false, // يصبح للشركة مستحقات لدى الأدمن
+                        'is_company_paid' => false,
                     ]);
                 } catch (\Exception $e) {
-                    // تسجيل الخطأ في اللوغز لضمان متابعته بدون تعطيل تنفيذ التاسك
                     \Log::error('Stripe Capture Failed for Order #' . $order->id . ': ' . $e->getMessage());
+                    return $this->errorResponse('Payment processing failed. Please contact support.', 500);
                 }
             }
 
-            // 2. تحديث حالة الطلب وإرسال الإشعارات (كودك الحالي)
+            $client->notifications()->create([
+                'title_ar' => 'طلبك في الطريق',
+                'body_ar' => "طلبك رقم #{$order->id} في الطريق الآن. شكرًا لاستخدامك خدماتنا.",
+                'title_en' => 'Your Order Is On the Way',
+                'body_en' => "Your order #{$order->id} is on the way. Thank you for using our services.",
+                'is_read' => false,
+                'data' => [
+                    'type' => 'order_status_changed',
+                    'order_id' => $order->id,
+                    'status' => 'on_way',
+                ]
+            ]);
+
+            $order->update(['status' => 'in_process']);
+
+            foreach ($client->fcmTokens as $token) {
+                $notificationTitle = $onWayNotifications[$token->lang]['title'] ?? $onWayNotifications['en']['title'];
+                $notificationBody = $onWayNotifications[$token->lang]['body'] ?? $onWayNotifications['en']['body'];
+                app(FirebaseNotificationService::class)->sendPushNotification(
+                    $token->token,
+                    $notificationTitle,
+                    $notificationBody,
+                    [
+                        'notification_id' => $client->notifications()->latest()->first()->id,
+                        'type' => 'order_status_changed',
+                        'order_id' => $order->id,
+                        'status' => 'on_way',
+                    ]
+                );
+            }
+        }
+
+        if ($validated['status'] === 'handling') {
             $client->notifications()->create([
                 'title_ar' => 'طلبك قيد المعالجة',
                 'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
