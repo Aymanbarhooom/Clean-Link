@@ -870,7 +870,7 @@ class OrderController extends Controller
                 $order->update(['payment_status' => 'refunded']);
             }
             // 2. إذا كان المبلغ قد اقتُطع بالفعل، نردّه للعميل
-            elseif ($order->payment_status === 'paid') {
+            elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
                 $stripe->refunds->create([
                     'payment_intent' => $order->stripe_payment_intent_id,
                 ]);
@@ -895,7 +895,7 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
-            'payment_status' => ['nullable', 'string', 'in:pending,held,paid,refunded'],
+            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,paid,refunded'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -938,7 +938,8 @@ class OrderController extends Controller
         }
 
         if (!empty($validated['payment_status'])) {
-            $query->where('payment_status', $validated['payment_status']);
+            $normalizedPaymentStatus = $validated['payment_status'] === 'paid' ? 'captured' : $validated['payment_status'];
+            $query->where('payment_status', $normalizedPaymentStatus);
         }
 
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
