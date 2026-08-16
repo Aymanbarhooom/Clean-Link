@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Stripe\Webhook;
-use Stripe\Exception\SignatureVerificationException;
 
 class StripeWebhookController extends Controller
 {
@@ -22,25 +22,53 @@ class StripeWebhookController extends Controller
                 $sigHeader,
                 $endpointSecret
             );
-        } catch (\UnexpectedValueException $e) {
-            return response()->json(['error' => 'Invalid payload'], 400);
-        } catch (SignatureVerificationException $e) {
-            return response()->json(['error' => 'Invalid signature'], 400);
+        } catch (\Exception $e) {
+            Log::error('Stripe Webhook Signature Error: ' . $e->getMessage());
+            return response()->json(['error' => 'Invalid payload or signature'], 400);
         }
 
-        // عند نجاح حجز المبلغ وإمكانية اقتطاعه لاحقاً
-        if ($event->type === 'payment_intent.amount_capturable_updated') {
-            $paymentIntent = $event->data->object;
-            $orderId = $paymentIntent->metadata->order_id ?? null;
+        $object = $event->data->object;
+        $orderId = $object->metadata->order_id ?? null;
 
-            if ($orderId) {
-                $order = Order::find($orderId);
-                if ($order && $order->payment_method === 'electric') {
-                    $order->update([
-                        'payment_status' => 'held'
-                    ]);
-                }
+        // البحث عن الطلب إما عبر metadata أو عبر stripe_payment_intent_id
+        $order = null;
+        if ($orderId) {
+            $order = Order::find($orderId);
+        } elseif (isset($object->id)) {
+            $order = Order::where('stripe_payment_intent_id', $object->id)->first();
+        }
+
+        if ($order) {
+            switch ($event->type) {
+                // 1. عند حجز المبلغ نجاح من الـ Payment Sheet
+                case 'payment_intent.amount_capturable_updated':
+                case 'charge.succeeded':
+                    if ($order->payment_method === 'electric' && $object->status === 'requires_capture') {
+                        $order->update(['payment_status' => 'held']);
+                        Log::info("Order #{$order->id} payment status updated to 'held'.");
+                    }
+                    break;
+
+                // 2. عند اقتطاع المبلغ فعلياً (Captured)
+                case 'payment_intent.succeeded':
+                case 'charge.captured':
+                    if ($order->payment_method === 'electric') {
+                        $order->update([
+                            'payment_status' => 'paid',
+                            'is_company_paid' => false,
+                        ]);
+                        Log::info("Order #{$order->id} payment status updated to 'paid'.");
+                    }
+                    break;
+
+                // 3. عند إلغاء الدفع
+                case 'payment_intent.canceled':
+                    $order->update(['payment_status' => 'refunded']);
+                    Log::info("Order #{$order->id} payment intent canceled.");
+                    break;
             }
+        } else {
+            Log::warning("Stripe Webhook: Order not found for Event {$event->type}");
         }
 
         return response()->json(['status' => 'success'], 200);
