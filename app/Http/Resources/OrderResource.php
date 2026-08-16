@@ -21,6 +21,8 @@ class OrderResource extends JsonResource
             'package_id' => $this->package_id,
             'status' => $this->status,
             'location' => $this->location,
+            'longitude' => $this->longitude,
+            'latitude' => $this->latitude,
             'start_time' => $this->start_time,
             'end_time' => $this->end_time,
             'duration' => $this->duration,

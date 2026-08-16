@@ -116,6 +116,7 @@ class TaskController extends Controller
         if ($validated['status'] === 'done') {
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
+            $order->update(['payment_status' => 'paid']); // Mark the order as paid when completed
 
             foreach ($workers as $worker) {
                 $worker->workerProfile->status = 'available';
