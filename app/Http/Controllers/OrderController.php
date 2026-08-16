@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
+use App\Http\Resources\OrderLocationResource;
 use App\Models\Package;
 use App\Models\Order;
 use App\Models\Service;
@@ -15,6 +16,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
@@ -894,16 +896,16 @@ class OrderController extends Controller
         $this->authorize('viewAny', Order::class);
 
         $user = auth()->user();
-        $perPage = $request->get('per_page', 10);
+        $validated = $request->validate([
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+        $perPage = $validated['per_page'] ?? 10;
 
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
-        if ($user->isAdmin()) {
-            // admin sees everything
-        } elseif ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company)
-                return $this->successResponse([
+        if (! $this->applyOrderVisibilityScope($query, $user)) {
+            return $this->successResponse([
                     'data' => [],
                     'pagination' => [
                         'current_page' => 1,
@@ -915,16 +917,6 @@ class OrderController extends Controller
                         'has_more_pages' => false,
                     ]
                 ], 'No company registered');
-
-            $query->whereHas('package.service', function ($q) use ($company) {
-                $q->where('company_id', $company->id);
-            });
-        } elseif ($user->role === 'region_manager') {
-            $query->whereHas('package.service.company', function ($q) use ($user) {
-                $q->whereIn('region_id', $user->managedRegions()->pluck('id'));
-            });
-        } else {
-            $query->where('client_id', $user->id);
         }
 
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
@@ -945,6 +937,46 @@ class OrderController extends Controller
         return $this->successResponse($responseData, 'Orders index fetched successfully');
     }
 
+    /**
+     * Return all visible orders that have usable coordinates for map markers.
+     */
+    public function locations(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Order::class);
+
+        $query = Order::query()
+            ->select([
+                'id',
+                'client_id',
+                'package_id',
+                'latitude',
+                'longitude',
+                'status',
+                'location',
+                'start_time',
+                'end_time',
+                'total_price',
+            ])
+            ->with([
+                'client:id,fullname',
+                'package:id,service_id,name_ar,name_en',
+                'package.service:id,name_ar,name_en',
+            ])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if (! $this->applyOrderVisibilityScope($query, auth()->user())) {
+            return $this->successResponse([], 'No company registered');
+        }
+
+        $orders = $query->orderByDesc('created_at')->get();
+
+        return $this->successResponse(
+            OrderLocationResource::collection($orders),
+            'Order locations fetched successfully'
+        );
+    }
+
     public function show(Order $order): JsonResponse
     {
         $this->authorize('view', $order);
@@ -952,6 +984,42 @@ class OrderController extends Controller
         $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile', 'tasks.workgroup.leader.profile']);
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
+    }
+
+    /**
+     * Apply the same role and company boundaries used by the Orders index.
+     */
+    private function applyOrderVisibilityScope(Builder $query, User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($user->isCompanyManager()) {
+            $company = $user->managedCompanies()->first();
+
+            if (! $company) {
+                return false;
+            }
+
+            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+                $serviceQuery->where('company_id', $company->id);
+            });
+
+            return true;
+        }
+
+        if ($user->role === 'region_manager') {
+            $query->whereHas('package.service.company', function (Builder $companyQuery) use ($user) {
+                $companyQuery->whereIn('region_id', $user->managedRegions()->pluck('id'));
+            });
+
+            return true;
+        }
+
+        $query->where('client_id', $user->id);
+
+        return true;
     }
 
 

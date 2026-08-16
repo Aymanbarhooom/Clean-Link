@@ -67,7 +67,8 @@ class ComplaintResponseController extends Controller
         // Load relationships for response
         $response->load(['responder.profile']);
 
-        $responseNotifications = [
+        if (!$response->is_internal) {
+            $responseNotifications = [
             'ar' => [
                 'title' => 'تم الرد على شكواك',
                 'body' => "تم الرد على شكواك بخصوص الطلب رقم #{$complaint->id}. شكرًا لاستخدامك خدماتنا.",
@@ -77,7 +78,7 @@ class ComplaintResponseController extends Controller
                 'body' => "We have responded to your complaint regarding order #{$complaint->id}. Thank you for using our services.",
             ]
         ];
-        $client->notifications()->create([
+            $notification = $client->notifications()->create([
             'title_ar' => $responseNotifications['ar']['title'],
             'body_ar' => $responseNotifications['ar']['body'],
             'title_en' => $responseNotifications['en']['title'],
@@ -87,20 +88,21 @@ class ComplaintResponseController extends Controller
                 'type' => 'complaint_response',
                 'complaint_id' => $complaint->id,
             ]
-        ]);
-        foreach ($client->fcmTokens as $token) {
-            $notificationTitle = $responseNotifications[$token->lang]['title'] ?? $responseNotifications['en']['title'];
-            $notificationBody = $responseNotifications[$token->lang]['body'] ?? $responseNotifications['en']['body'];
-            app(FirebaseNotificationService::class)->sendPushNotification(
-                $token->token,
-                $notificationTitle,
-                $notificationBody,
-                [
-                    'notification_id' => $client->notifications()->latest()->first()->id,
-                    'type' => 'complaint_response',
-                    'complaint_id' => $complaint->id,
-                ]
-            );
+            ]);
+            foreach ($client->fcmTokens as $token) {
+                $notificationTitle = $responseNotifications[$token->lang]['title'] ?? $responseNotifications['en']['title'];
+                $notificationBody = $responseNotifications[$token->lang]['body'] ?? $responseNotifications['en']['body'];
+                app(FirebaseNotificationService::class)->sendPushNotification(
+                    $token->token,
+                    $notificationTitle,
+                    $notificationBody,
+                    [
+                        'notification_id' => $notification->id,
+                        'type' => 'complaint_response',
+                        'complaint_id' => $complaint->id,
+                    ]
+                );
+            }
         }
 
         return $this->successResponse($response, 'Response added successfully', 201);

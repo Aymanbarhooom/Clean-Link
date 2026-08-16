@@ -19,7 +19,7 @@ class ComplaintController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = auth()->user();
-        
+
         // Only clients can create complaints
         if ($user->role !== 'client') {
             return $this->errorResponse('Only clients are authorized to submit complaints', 403);
@@ -290,7 +290,7 @@ class ComplaintController extends Controller
     public function unreadCount(): JsonResponse
     {
         $user = auth()->user();
-        
+
         $count = $this->getUnreadComplaintsCount($user);
 
         return $this->successResponse([
@@ -343,7 +343,7 @@ class ComplaintController extends Controller
         }
 
         $companyIds = $user->managedCompanies()->pluck('id');
-        
+
         return Complaint::where('id', $complaint->id)
             ->whereHas('complaintable', function ($q) use ($companyIds) {
                 $q->whereIn('company_id', $companyIds);
@@ -364,7 +364,7 @@ class ComplaintController extends Controller
                     'service' => Complaint::where('complaintable_type', Service::class)->count(),
                 ],
             ];
-        } 
+        }
         elseif ($user->isCompanyManager()) {
             $companyIds = $user->managedCompanies()->pluck('id');
             $stats = [
@@ -400,7 +400,7 @@ class ComplaintController extends Controller
 
         if ($user->isCompanyManager()) {
             $companyIds = $user->managedCompanies()->pluck('id');
-            
+
             if ($companyIds->isEmpty()) {
                 return 0;
             }
@@ -458,7 +458,7 @@ class ComplaintController extends Controller
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
         $allowedSorts = ['created_at', 'title', 'is_read'];
-        
+
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder);
         }

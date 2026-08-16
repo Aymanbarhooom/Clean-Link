@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ServiceResource;
+use App\Http\Resources\SkillResource;
 use App\Models\Package;
 use App\Models\Service;
 use App\Traits\ApiResponse;
@@ -28,7 +29,11 @@ class ServiceController extends Controller
     public function index(Request $request): JsonResponse
 {
     $user = auth()->user();
-    $perPage = $request->get('per_page', 6);
+    $validated = $request->validate([
+        'page' => 'sometimes|integer|min:1',
+        'per_page' => 'sometimes|integer|min:1|max:100',
+    ]);
+    $perPage = $validated['per_page'] ?? 6;
     
     $query = Service::with(['company.region','category']);
 
@@ -79,6 +84,44 @@ class ServiceController extends Controller
          return $this->successResponse($service, 'Comprehensive service parameters aggregated');
         }
         return $this->successResponse(new ServiceResource($service), 'Comprehensive service parameters aggregated');
+    }
+
+    /**
+     * Return the service's assigned skills with server-side pagination.
+     */
+    public function skills(Request $request, Service $service): JsonResponse
+    {
+        $user = auth()->user();
+
+        if ($user->isCompanyManager()) {
+            $this->authorize('update', $service);
+        }
+
+        $validated = $request->validate([
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+        $perPage = $validated['per_page'] ?? 10;
+
+        $skills = $service->requiredSkills()
+            ->select(['skills.id', 'skills.name_ar', 'skills.name_en'])
+            ->orderBy('skills.id', 'asc')
+            ->paginate($perPage);
+
+        $responseData = [
+            'data' => SkillResource::collection($skills->items()),
+            'pagination' => [
+                'current_page' => $skills->currentPage(),
+                'per_page' => $skills->perPage(),
+                'total' => $skills->total(),
+                'last_page' => $skills->lastPage(),
+                'from' => $skills->firstItem(),
+                'to' => $skills->lastItem(),
+                'has_more_pages' => $skills->hasMorePages(),
+            ],
+        ];
+
+        return $this->successResponse($responseData, 'Service skills fetched successfully');
     }
 
     /**
@@ -313,4 +356,3 @@ class ServiceController extends Controller
     }
  
 }
-

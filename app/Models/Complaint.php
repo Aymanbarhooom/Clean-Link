@@ -15,6 +15,7 @@ class Complaint extends Model
         'body',
         'is_read',
         'read_at',
+        'client_read_at',
         'complaintable_id',
         'complaintable_type'
     ];
@@ -22,6 +23,7 @@ class Complaint extends Model
     protected $casts = [
         'is_read' => 'boolean',
         'read_at' => 'datetime',
+        'client_read_at' => 'datetime',
     ];
 
     // Relationships
