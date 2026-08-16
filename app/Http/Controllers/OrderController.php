@@ -363,7 +363,7 @@ class OrderController extends Controller
             'attributes.*.qty' => 'required|integer|min:1',
 
             // Payment
-            'payment_method' => 'required|in:electric,cash',
+            'payment_method' => 'required|in:electric,manual',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -427,7 +427,7 @@ class OrderController extends Controller
                     ? 'pending'
                     : 'held',
                 'is_done_with_admin' => false,
-                'is_company_paid' => $validated['payment_method'] === 'cash',
+                'is_company_paid' => $validated['payment_method'] === 'manual',
             ]);
 
             $order->calculateAndSetPaymentShares();
@@ -575,7 +575,7 @@ class OrderController extends Controller
             'note' => 'nullable|string|max:1000',
 
             // Payment
-            'payment_method' => 'required|in:electric,cash',
+            'payment_method' => 'required|in:electric,manual',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -672,7 +672,7 @@ class OrderController extends Controller
 
                 'is_done_with_admin' => false,
 
-                'is_company_paid' => $validated['payment_method'] === 'cash',
+                'is_company_paid' => $validated['payment_method'] === 'manual',
             ]);
 
             /*
