@@ -16,6 +16,12 @@ class Kernel extends ConsoleKernel
             ->everyThirtyMinutes()  // ينفذ كل نصف ساعة
             ->withoutOverlapping()  // يمنع التشغيل المتزامن لمهمات طويلة
             ->runInBackground();
+
+        // Check electric pending payments every minute
+        Schedule::command('orders:cancel-electric-pending')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     /**

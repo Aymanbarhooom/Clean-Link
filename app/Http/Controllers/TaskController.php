@@ -219,7 +219,7 @@ class TaskController extends Controller
                 ]
             ]);
 
-            $order->update(['status' => 'in_process']);
+            $order->update(['status' => 'on_way']);
 
             foreach ($client->fcmTokens as $token) {
                 $notificationTitle = $onWayNotifications[$token->lang]['title'] ?? $onWayNotifications['en']['title'];
