@@ -54,10 +54,10 @@ class StripeWebhookController extends Controller
                 case 'charge.captured':
                     if ($order->payment_method === 'electric') {
                         $order->update([
-                            'payment_status' => 'paid',
+                            'payment_status' => 'captured',
                             'is_company_paid' => false,
                         ]);
-                        Log::info("Order #{$order->id} payment status updated to 'paid'.");
+                        Log::info("Order #{$order->id} payment status updated to 'captured'.");
                     }
                     break;
 

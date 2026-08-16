@@ -85,7 +85,26 @@ class TaskController extends Controller
             $validated['image_after'] = $request->file('image_after')->store('task_images', 'public');
         }
 
-        $task->update(array_filter($validated));
+        $statusProgression = [
+            'pending' => 'on_way',
+            'on_way' => 'handling',
+            'handling' => 'done',
+        ];
+
+        if ($validated['status'] !== $task->status) {
+            $expectedStatus = $statusProgression[$task->status] ?? null;
+
+            if ($expectedStatus === null) {
+                return $this->errorResponse('This task is already completed and cannot be advanced further.', 422);
+            }
+
+            if ($validated['status'] !== $expectedStatus) {
+                return $this->errorResponse(
+                    "Invalid task status progression. This task can only move from {$task->status} to {$expectedStatus}.",
+                    422
+                );
+            }
+        }
 
         $doneNotifications = [
             'ar' => [
@@ -129,7 +148,7 @@ class TaskController extends Controller
         if ($validated['status'] === 'done') {
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
-            $order->update(['payment_status' => 'paid']);
+            $order->update(['payment_status' => 'captured']);
 
             foreach ($workers as $worker) {
                 $worker->workerProfile->status = 'available';
@@ -166,13 +185,13 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'on_way') {
-            if ($order->payment_method === 'electric' && $order->payment_status === 'held' && $order->stripe_payment_intent_id) {
+            if ($order->payment_method === 'electric' && in_array($order->payment_status, ['held', 'paid'], true) && $order->stripe_payment_intent_id) {
                 try {
                     $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
                     $stripe->paymentIntents->capture($order->stripe_payment_intent_id);
 
                     $order->update([
-                        'payment_status' => 'paid',
+                        'payment_status' => 'captured',
                         'is_company_paid' => false,
                     ]);
                 } catch (\Exception $e) {
@@ -180,6 +199,12 @@ class TaskController extends Controller
                     return $this->errorResponse('Payment processing failed. Please contact support.', 500);
                 }
             }
+
+            $task->update([
+                'status' => 'on_way',
+                'image_before' => $validated['image_before'] ?? $task->image_before,
+                'image_after' => $validated['image_after'] ?? $task->image_after,
+            ]);
 
             $client->notifications()->create([
                 'title_ar' => 'طلبك في الطريق',
@@ -214,6 +239,12 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'handling') {
+            $task->update([
+                'status' => 'handling',
+                'image_before' => $validated['image_before'] ?? $task->image_before,
+                'image_after' => $validated['image_after'] ?? $task->image_after,
+            ]);
+
             $client->notifications()->create([
                 'title_ar' => 'طلبك قيد المعالجة',
                 'body_ar' => "طلبك رقم #{$order->id} قيد المعالجة. شكرًا لاستخدامك خدماتنا.",
