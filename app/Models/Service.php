@@ -37,7 +37,6 @@ class Service extends Model
         'discount' => 'float',
     ];
 
-    // --- Relationships ---
 
     public function company(): BelongsTo
     {

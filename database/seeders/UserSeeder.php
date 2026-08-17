@@ -9,7 +9,6 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Admin Account
         $admin = User::create([
             'fullname' => 'System Administrator',
             'email' => 'admin@cleaning.com',
@@ -18,7 +17,6 @@ class UserSeeder extends Seeder
         ]);
         $admin->profile()->create(['phone' => '+96311000000', 'address' => 'HQ Main Office']);
 
-        // 3. Company Managers
         $cm1 = User::create([
             'fullname' => 'John Company Manager',
             'email' => 'john.cm@cleaning.com',
@@ -35,7 +33,6 @@ class UserSeeder extends Seeder
         ]);
         $cm2->profile()->create(['phone' => '+96311444444', 'address' => 'Sparkle Solutions Base']);
 
-        // 4. Clients
         $client1 = User::create([
             'fullname' => 'يعقوب قمر الدين',
             'email' => 'client1@cleaning.com',

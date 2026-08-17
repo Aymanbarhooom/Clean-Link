@@ -16,7 +16,6 @@ return new class extends Migration
             $table->boolean('is_read')->default(false);
             $table->timestamp('read_at')->nullable();
             
-            // Polymorphic Columns for Service & Company models
             $table->unsignedBigInteger('complaintable_id');
             $table->string('complaintable_type');
             $table->index(['complaintable_id', 'complaintable_type']);

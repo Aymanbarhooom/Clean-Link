@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/TaskSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Order;
@@ -13,7 +12,6 @@ class TaskSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Fetch the very first workgroup crew configured in the system indices
         $firstWorkgroup = Workgroup::first();
 
         if (!$firstWorkgroup) {
@@ -21,7 +19,6 @@ class TaskSeeder extends Seeder
             return;
         }
 
-        // 2. Fetch all orders currently waiting for team assignment
         $pendingOrders = Order::where('status', 'pending')->get();
 
         if ($pendingOrders->isEmpty()) {
@@ -29,20 +26,17 @@ class TaskSeeder extends Seeder
             return;
         }
 
-        // 3. Loop and bulk-dispatch every order to the first crew crew team
         foreach ($pendingOrders as $order) {
             
             DB::transaction(function () use ($order, $firstWorkgroup) {
-                // Generate the active operational workflow task entry for the collective team
                 Task::create([
                     'order_id' => $order->id,
                     'workgroup_id' => $firstWorkgroup->id,
-                    'status' => 'pending', // Crews default straight to 'Pending' state on dispatch
-                    'image_before' => null, // Waiting for field action triggers
-                    'image_after' => null,  // Waiting for completion triggers
+                    'status' => 'pending', 
+                    'image_before' => null, 
+                    'image_after' => null, 
                 ]);
 
-                // Update parent order tracking configuration parameters state 
                 $order->update([
                     'status' => 'assigned_to_worker'
                 ]);

@@ -14,7 +14,6 @@ return new class extends Migration
             $table->text('comment')->nullable()->default("");
             $table->tinyInteger('rating')->unsigned();
             
-            // Polymorphic Columns for Service & Company models
             $table->unsignedBigInteger('reviewable_id');
             $table->string('reviewable_type');
             $table->index(['reviewable_id', 'reviewable_type']);

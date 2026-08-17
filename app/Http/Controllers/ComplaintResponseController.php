@@ -14,14 +14,11 @@ use Illuminate\Validation\Rule;
 
 class ComplaintResponseController extends Controller
 {
-    /**
-     * Store a new response to a complaint
-     */
+
     public function store(Request $request): JsonResponse
     {
         $user = auth()->user();
 
-        // Only admins and company managers can respond
         if (!$user->isAdmin() && !$user->isCompanyManager()) {
             return $this->errorResponse('Only admins and company managers can respond to complaints', 403);
         }
@@ -32,7 +29,6 @@ class ComplaintResponseController extends Controller
             'is_internal' => 'boolean',
         ]);
 
-        // Find the complaint
         $complaint = Complaint::find($validated['complaint_id']);
         $client = $complaint->client;
 
@@ -40,7 +36,6 @@ class ComplaintResponseController extends Controller
             return $this->errorResponse('Complaint not found', 404);
         }
 
-        // Check authorization for company managers
         if ($user->isCompanyManager()) {
             $canRespond = $this->canManagerRespondToComplaint($user, $complaint);
 
@@ -49,7 +44,6 @@ class ComplaintResponseController extends Controller
             }
         }
 
-        // Create the response
         $response = new ComplaintResponse([
             'complaint_id' => $complaint->id,
             'responder_id' => $user->id,
@@ -59,12 +53,10 @@ class ComplaintResponseController extends Controller
 
         $response->save();
 
-        // Mark complaint as read when responded
         if (!$complaint->is_read) {
             $complaint->markAsRead();
         }
 
-        // Load relationships for response
         $response->load(['responder.profile']);
 
         $responseNotifications = [
@@ -106,9 +98,7 @@ class ComplaintResponseController extends Controller
         return $this->successResponse($response, 'Response added successfully', 201);
     }
 
-    /**
-     * Get responses for a specific complaint
-     */
+ 
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -119,14 +109,12 @@ class ComplaintResponseController extends Controller
 
         $complaint = Complaint::find($request->complaint_id);
 
-        // Check authorization to view responses
         if (!$this->canViewResponses($user, $complaint)) {
             return $this->errorResponse('Unauthorized to view these responses', 403);
         }
 
         $perPage = $request->get('per_page', 10);
 
-        // For clients, only show external responses
         if ($user->role === 'client') {
             $responses = $complaint->responses()
                 ->where('is_internal', false)
@@ -134,7 +122,6 @@ class ComplaintResponseController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->paginate($perPage);
         } else {
-            // Admins and managers see all responses
             $responses = $complaint->responses()
                 ->with(['responder.profile'])
                 ->orderBy('created_at', 'desc')
@@ -165,14 +152,11 @@ class ComplaintResponseController extends Controller
         return $this->successResponse($responseData, 'Responses fetched successfully');
     }
 
-    /**
-     * Update a response (only the responder can update)
-     */
+   
     public function update(Request $request, ComplaintResponse $response): JsonResponse
     {
         $user = auth()->user();
 
-        // Only the responder can update their response
         if ($response->responder_id !== $user->id) {
             return $this->errorResponse('You can only update your own responses', 403);
         }
@@ -189,14 +173,10 @@ class ComplaintResponseController extends Controller
         );
     }
 
-    /**
-     * Delete a response (only responder or admin)
-     */
     public function destroy(Request $request, ComplaintResponse $response): JsonResponse
     {
         $user = auth()->user();
 
-        // Only the responder or admin can delete
         if ($response->responder_id !== $user->id && !$user->isAdmin()) {
             return $this->errorResponse('Unauthorized to delete this response', 403);
         }
@@ -206,23 +186,19 @@ class ComplaintResponseController extends Controller
         return $this->successResponse(null, 'Response deleted successfully');
     }
 
-    // ============ Helper Methods ============
 
     private function canManagerRespondToComplaint(User $user, Complaint $complaint): bool
     {
-        // Only can respond to complaints about services
         if ($complaint->complaintable_type !== Service::class) {
             return false;
         }
 
-        // Get the service and check if it belongs to this manager's company
         $service = Service::find($complaint->complaintable_id);
 
         if (!$service) {
             return false;
         }
 
-        // Check if the service belongs to a company managed by this user
         $companyIds = $user->managedCompanies()->pluck('id');
 
         return $companyIds->contains($service->company_id);
@@ -245,7 +221,6 @@ class ComplaintResponseController extends Controller
         return false;
     }
 
-    // ============ Error Response Helper ============
     private function errorResponse(string $message, int $statusCode): JsonResponse
     {
         return response()->json([

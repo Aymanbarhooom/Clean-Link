@@ -126,7 +126,6 @@ class CompanyManagerController extends Controller
 
     public function deleteWorker(User $worker): JsonResponse
     {
-        // Enforces Admin or company boundary controls before removing user identities from tables
         if (!auth()->user()->isAdmin() && auth()->user()->id !== $worker->workerProfile?->company?->manager_id) {
             return $this->errorResponse('Access execution context restricted', 403);
         }

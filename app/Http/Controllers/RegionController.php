@@ -22,7 +22,6 @@ class RegionController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    // --- Region Managers Management (Admin Area) ---
 
     public function addManager(Request $request): JsonResponse
     {
@@ -60,11 +59,9 @@ class RegionController extends Controller
         return $this->successResponse([], 'Region Manager deleted successfully');
     }
 
-    // --- Regions Boundary Architecture Management ---
 
     public function addRegion(Request $request): JsonResponse
     {
-        // Handled via standard structural role checking rule inside controllers or custom policy
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Unauthorized operation access boundary profile mismatch', 403);
         }
@@ -86,7 +83,6 @@ class RegionController extends Controller
     }
     public function updateRegion(Request $request, Region $region): JsonResponse
     {
-        // Handled via standard structural role checking rule inside controllers or custom policy
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Unauthorized operation access boundary profile mismatch', 403);
         }
@@ -109,14 +105,11 @@ class RegionController extends Controller
     $user = auth()->user();
     $perPage = $request->get('per_page', 6);
 
-    // تبسيط شروط الوصول
     if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
         return $this->errorResponse('Access mapping blocked', 403);
     }
 
-    // بناء الـ Query بناءً على دور المستخدم
     if ($user->isAdmin() || $user->role === 'client') {
-        // 🔥 استخدام مفتاح واحد فقط بدلاً من مفاتيح متعددة لكل صفحة
         $cacheKey = 'all_regions_with_managers_all';
         
         $allRegions = Cache::remember($cacheKey, now()->addDay(), function () {
@@ -125,7 +118,6 @@ class RegionController extends Controller
                 ->get();
         });
         
-        // تطبيق التقسيم يدوياً
         $currentPage = $request->get('page', 1);
         $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
         
@@ -139,12 +131,10 @@ class RegionController extends Controller
                 ->get();
         });
         
-        // تطبيق التقسيم يدوياً
         $currentPage = $request->get('page', 1);
         $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
     }
 
-    // تجهيز الـ Response
     $responseData = [
         'data' => $paginated->items(),
         'pagination' => [
@@ -161,9 +151,7 @@ class RegionController extends Controller
     return $this->successResponse($responseData, 'Regions context retrieved');
 }
 
-/**
- * تحويل Collection إلى Paginator يدوياً
- */
+
 protected function paginateCollection($collection, int $perPage, int $currentPage)
 {
     $items = $collection->forPage($currentPage, $perPage);

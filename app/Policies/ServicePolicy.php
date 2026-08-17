@@ -1,6 +1,5 @@
 <?php
 
-// app/Policies/ServicePolicy.php
 namespace App\Policies;
 
 use App\Models\User;
@@ -10,7 +9,7 @@ class ServicePolicy
 {
     public function viewAny(User $user): bool
     {
-        return true; // Access filtering context is parsed inside index action queries
+        return true; 
     }
 
     public function create(User $user): bool

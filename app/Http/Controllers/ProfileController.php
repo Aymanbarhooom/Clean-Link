@@ -18,9 +18,7 @@ class ProfileController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    /**
-     * Retrieve current authenticating session user's specific profile metrics.
-     */
+  
     public function show(): JsonResponse
     {
         $profile = auth()->user()->profile;
@@ -32,9 +30,7 @@ class ProfileController extends Controller
         return $this->successResponse($profile, 'User identity profile records fetched');
     }
 
-    /**
-     * Update current authenticated identity parameters cleanly.
-     */
+   
     public function update(Request $request): JsonResponse
     {
         $profile = auth()->user()->profile()->firstOrCreate(['user_id' => auth()->id()]);

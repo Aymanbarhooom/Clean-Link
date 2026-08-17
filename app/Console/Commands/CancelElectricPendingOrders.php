@@ -22,7 +22,6 @@ class CancelElectricPendingOrders extends Command
 
         foreach ($orders as $order) {
             try {
-                // Handle Stripe intents/refunds if present (defensive)
                 if ($order->stripe_payment_intent_id) {
                     try {
                         $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
@@ -41,7 +40,6 @@ class CancelElectricPendingOrders extends Command
                 $order->update(['status' => 'canceled']);
                 $order->tasks()->delete();
 
-                // Notify client
                 $client = $order->client;
                 if ($client) {
                     $client->notifications()->create([

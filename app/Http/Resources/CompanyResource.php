@@ -31,7 +31,7 @@ class CompanyResource extends JsonResource
         'region' => new RegionResource($this->whenLoaded('region')),
         'services' => ServiceResource::collection($this->whenLoaded('services')),
         'workers' => $this->whenLoaded('workers'),
-        'reviews' => $this->whenLoaded('reviews'), // يفضل عمل ReviewResource لاحقاً
+        'reviews' => $this->whenLoaded('reviews'),
         'workTimes' => $this->whenLoaded('workTimes'),
 
         'created_at' => $this->created_at,
