@@ -59,6 +59,12 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    //payments relationship
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
 
 
     // --- Helper Functions ---

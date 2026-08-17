@@ -72,8 +72,8 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'status' => 'required|in:pending,on_way,handling,done',
-            'image_before' => 'nullable|image|max:2048', 
-            'image_after' => 'nullable|image|max:2048',  
+            'image_before' => 'nullable|image|max:2048',
+            'image_after' => 'nullable|image|max:2048',
         ]);
 
         if ($request->hasFile('image_before')) {
@@ -191,6 +191,10 @@ class TaskController extends Controller
                     $order->update([
                         'payment_status' => 'captured',
                         'is_company_paid' => false,
+                    ]);
+                    $order->payments()->latest()->update([
+                        'payment_status' => 'paid',
+                        'paid_at' => now(),
                     ]);
                 } catch (\Exception $e) {
                     \Log::error('Stripe Capture Failed for Order #' . $order->id . ': ' . $e->getMessage());
