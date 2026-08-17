@@ -29,7 +29,6 @@ class ComplaintResponse extends Model
         return $this->belongsTo(User::class, 'responder_id');
     }
 
-    // Scopes
     public function scopeExternal($query)
     {
         return $query->where('is_internal', false);

@@ -28,7 +28,6 @@ class PackageResource extends JsonResource
             'is_open_package' => $this->is_open_package,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-            // العلاقات
             'service' => new ServiceResource($this->whenLoaded('service')),
         ];
     }

@@ -10,7 +10,6 @@ class Task extends Model
 {
     protected $fillable = ['order_id', 'workgroup_id', 'status', 'image_before', 'image_after'];
 
-    // --- Relationships ---
 
     public function order(): BelongsTo
     {

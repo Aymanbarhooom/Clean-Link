@@ -1,6 +1,5 @@
 <?php
 
-// app/Models/Workgroup.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -37,7 +36,6 @@ class Workgroup extends Model
     
     public function getCombinedSkillIds(): array
     {
-        // Load nested worker profile skill IDs cleanly
         return $this->workers()
             ->with('workerProfile.skills')
             ->get()

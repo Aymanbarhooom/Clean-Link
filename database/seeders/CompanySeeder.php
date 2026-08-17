@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/CompanySeeder.php
 namespace Database\Seeders;
 
 use App\Models\Company;
@@ -16,7 +15,6 @@ class CompanySeeder extends Seeder
     $regions = Region::all();
     $managers = User::where('role', 'company_manager')->get();
 
-    // التأكد من وجود بيانات لتجنب الأخطاء
     if ($managers->count() < 2 || $regions->count() < 4) {
         return;
     }
@@ -62,7 +60,7 @@ class CompanySeeder extends Seeder
             'location_en' => 'Homs - Jouret al-Shayah',
             'latitude' => 34.7020,
             'longitude' => 36.7618,
-            'rating' => 3.50, // تقييم متوسط
+            'rating' => 3.50,
 
         ],
         [
@@ -107,7 +105,7 @@ class CompanySeeder extends Seeder
             'location_en' => 'Aleppo - Al-Furqan',
             'latitude' => 36.2087,
             'longitude' => 37.1244,
-            'rating' => 3.10, // تقييم قليل
+            'rating' => 3.10, 
          
         ],
         [
@@ -167,7 +165,7 @@ class CompanySeeder extends Seeder
             'location_en' => 'Aleppo - Sulaymaniyah',
             'latitude' => 36.2087,
             'longitude' => 37.1244,
-            'rating' => 2.90, // تقييم قليل جداً
+            'rating' => 2.90, 
      
         ],
     ];

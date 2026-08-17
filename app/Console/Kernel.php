@@ -12,9 +12,15 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        Schedule::command('orders:cancel-pending')
+        $schedule->command('orders:cancel-pending')
             ->everyThirtyMinutes()  // ينفذ كل نصف ساعة
             ->withoutOverlapping()  // يمنع التشغيل المتزامن لمهمات طويلة
+            ->runInBackground();
+
+        // Check electric pending payments every minute
+        $schedule->command('orders:cancel-electric-pending')
+            ->everyMinute()
+            ->withoutOverlapping()
             ->runInBackground();
     }
 

@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/RegionSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Region;

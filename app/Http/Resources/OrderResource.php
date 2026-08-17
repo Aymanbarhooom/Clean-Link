@@ -39,7 +39,6 @@ class OrderResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
-            //relationships
             'client' => $this->whenLoaded('client'),
             'leader' => $this->getLeaderResource(),
             'package' => new PackageResource($this->package),

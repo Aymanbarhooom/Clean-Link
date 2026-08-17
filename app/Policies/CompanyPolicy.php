@@ -1,6 +1,5 @@
 <?php
 
-// app/Policies/CompanyPolicy.php
 namespace App\Policies;
 
 use App\Models\User;
@@ -10,7 +9,6 @@ class CompanyPolicy
 {
     public function viewAny(User $user): bool
     {
-        // Clients see everything, Admin sees everything, Region Manager filters in query loop
         return true; 
     }
 
@@ -30,7 +28,6 @@ class CompanyPolicy
 
     public function update(User $user, Company $company): bool
     {
-        // Only the Company Manager can update his own company settings
         return $user->isCompanyManager() && $user->id === $company->manager_id;
     }
 

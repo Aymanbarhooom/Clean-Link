@@ -21,7 +21,6 @@ class CompanyController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    // --- Company Managers Management Section ---
 
     public function addManager(Request $request): JsonResponse
     {
@@ -52,7 +51,7 @@ class CompanyController extends Controller
         $user = auth()->user();
         if ($user->isAdmin()) {
             $managers = User::where('role', 'company_manager')->with('profile')->get();
-        } else { // Region Manager filter context
+        } else {
             $managers = User::where('role', 'company_manager')
                 ->whereHas('managedCompanies', function ($q) use ($user) {
                     $q->whereHas('region', function ($r) use ($user) {
@@ -70,7 +69,6 @@ class CompanyController extends Controller
         return $this->successResponse([], 'Company Manager removed completely');
     }
 
-    // --- Company Asset Profiles Section ---
 
     public function addCompany(Request $request): JsonResponse
     {
@@ -117,7 +115,6 @@ class CompanyController extends Controller
             ];
         }
 
-        // استخدام insert لعملية إضافة سريعة (Bulk Insert)
         \App\Models\WorkTime::insert($workDays);
 
         return $this->successResponse($company, 'Company operational profile built', 211);
@@ -151,7 +148,6 @@ class CompanyController extends Controller
     $user = auth()->user();
     $perPage = $request->get('per_page', 6);
 
-    // High-density optimization using relational nested Eager Loading syntax matching clean data schemas 
     $query = Company::with([
         'region.manager',
         'workTimes'
@@ -165,10 +161,8 @@ class CompanyController extends Controller
         $query->where('manager_id', $user->id);
     }
 
-    // تطبيق Pagination بدلاً من get()
     $companies = $query->orderBy('id', 'asc')->paginate($perPage);
 
-    // تجهيز الـ Response حسب دور المستخدم
     $responseData = [
         'data' => $user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager() 
             ? $companies->items() 

@@ -61,18 +61,15 @@ class FavoriteController extends Controller
             return $this->errorResponse('Target favorite entity not found', 404);
         }
 
-        // البحث عن السجل للتأكد إن كان مضافاً مسبقاً أم لا
         $favoriteExists = Favorite::where('user_id', auth()->id())
             ->where('favoritable_id', $targetEntity->id)
             ->where('favoritable_type', $modelType)
             ->first();
 
         if ($favoriteExists) {
-            // إذا كان موجوداً، نقوم بحذفه (Remove from Favorite)
             $favoriteExists->delete();
             return $this->successResponse(['is_favorited' => false], 'Removed from favorites successfully');
         } else {
-            // إذا لم يكن موجوداً، نقوم بإنشائه (Add to Favorite)
             Favorite::create([
                 'user_id' => auth()->id(),
                 'favoritable_id' => $targetEntity->id,

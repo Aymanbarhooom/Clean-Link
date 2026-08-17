@@ -21,10 +21,7 @@ class ReviewController extends Controller
         $this->middleware('auth:sanctum')->except(['index']);
     }
 
-    /**
-     * Display a listing of reviews for a specific Company or Service.
-     * URL Example: /api/reviews?type=company&id=1 OR /api/reviews?type=service&id=5
-     */
+    
     public function index(Request $request): JsonResponse
     {
         $request->validate([
@@ -34,7 +31,6 @@ class ReviewController extends Controller
 
         $modelType = $request->type === 'company' ? Company::class : Service::class;
         
-        // Eager load the client profile details for the frontend mapping requirements
         $reviews = Review::where('reviewable_type', $modelType)
             ->where('reviewable_id', $request->id)
             ->with('client.profile')
@@ -44,9 +40,6 @@ class ReviewController extends Controller
         return $this->successResponse($reviews, 'Reviews lookup index fetched successfully');
     }
 
-    /**
-     * Store a newly created review in storage.
-     */
     public function store(Request $request): JsonResponse
     {
         if (auth()->user()->role !== 'client') {
@@ -90,7 +83,6 @@ class ReviewController extends Controller
             return $this->errorResponse('Only clients who used this can review!', 403);
         }
 
-        // Create the polymorphic review mapping
         $review = new Review([
             'client_id' => auth()->id(),
             'comment' => $validated['comment'],
@@ -99,7 +91,6 @@ class ReviewController extends Controller
 
         $reviewableEntity->reviews()->save($review);
 
-        // Explicitly trigger average rating recalculation on the model
         $reviewableEntity->recalculateRating();
 
         return $this->successResponse($review->load('client.profile'), 'Review submitted successfully', 211);

@@ -1,5 +1,4 @@
 <?php
-// database/seeders/ServiceImageSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Service;
