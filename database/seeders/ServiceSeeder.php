@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/ServiceSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Service;
@@ -14,15 +13,12 @@ class ServiceSeeder extends Seeder
 {
     public function run(): void
     {
-        // Fetch our pre-seeded vendor companies
         $ecoCleanHome = Company::where('name_en', 'EcoClean Pro Solutions')->first();
         $sparkleAuto = Company::where('name_en', 'Sparkle Auto Express')->first();
 
-        //Categories
         $homeCleaning = Category::where('name_en', 'Home')->first();
         $carWash = Category::where('name_en', 'Car')->first();
 
-        // Fetch our pre-seeded global dictionary attributes to link below
         $extraRooms = AttributeModel::where('name_en', 'Number of Extra Rooms')->first();
         $extraBaths = AttributeModel::where('name_en', 'Number of Extra Bathrooms')->first();
         $emptyHouse = AttributeModel::where('name_en', 'Is the House Empty (No Furniture)?')->first();
@@ -34,12 +30,10 @@ class ServiceSeeder extends Seeder
         $engineSteam = AttributeModel::where('name_en', 'Steam Engine Bay Cleaning')->first();
         $headlights = AttributeModel::where('name_en', 'Headlight Restoration & Polishing')->first();
        
-        //skills home
         $standardCleaning = Skill::where('name_en', 'Standard Residential Cleaning')->first();
         $deepCleaning = Skill::where('name_en', 'Deep Cleaning & Degreasing Operations')->first();
          $advancsdBathroom = Skill::where('name_en', 'Advanced Bathroom Disinfection')->first();
          $windowWashing = Skill::where('name_en', 'Window Washing & Exterior Glass Wiping')->first();
-         //skills car
          $exterior = Skill::where('name_en', 'Exterior Hydro-Steam Vehicle Washing')->first();
          $thermalSteam = Skill::where('name_en', 'Thermal Steam Engine Bay Detailing')->first();
          $headlights = Skill::where('name_en', 'Headlight Acrylic Restoration & Clarity Polishing')->first();
@@ -48,11 +42,6 @@ class ServiceSeeder extends Seeder
             return;
         }
 
-        // ==========================================================
-        // 🏠 COMPANY 1: EcoClean Pro Solutions (Home Cleaning Services)
-        // ==========================================================
-
-        // Service 1: Standard Apartment Refresh
         $s1 = Service::create([
             'company_id' => $ecoCleanHome->id,
             'category_id' => $homeCleaning->id,
@@ -68,20 +57,17 @@ class ServiceSeeder extends Seeder
             'image' => 'services/standard_apartment.jpg',
             'discount' => 0.00,
         ]);
-        // Attach localized flexible dynamic addon rules for this explicit service
         $s1->attributes()->attach([
             $extraRooms->id => ['price' => 15.00, 'duration' => 30],
             $extraBaths->id => ['price' => 20.00, 'duration' => 45],
             $fridge->id => ['price' => 10.00, 'duration' => 20]
         ]);
 
-        //Attach skills to the service
         $s1->requiredSkills()->attach([
             $standardCleaning->id,
             $windowWashing->id
         ]);
 
-        // Service 2: Deep Sanitization Package
         $s2 = Service::create([
             'company_id' => $ecoCleanHome->id,
             'category_id' => $homeCleaning->id,
@@ -99,7 +85,7 @@ class ServiceSeeder extends Seeder
         $s2->attributes()->attach([
             $extraRooms->id => ['price' => 25.00, 'duration' => 45],
             $extraBaths->id => ['price' => 35.00, 'duration' => 60],
-            $emptyHouse->id => ['price' => -20.00, 'duration' => -30] // Discounted because empty houses clean faster!
+            $emptyHouse->id => ['price' => -20.00, 'duration' => -30] 
         ]);
         $s2->requiredSkills()->attach([
             $deepCleaning->id,
@@ -107,7 +93,6 @@ class ServiceSeeder extends Seeder
             $windowWashing->id
         ]);
 
-        // Service 3: Post-Construction Wiping
         $s3 = Service::create([
             'company_id' => $ecoCleanHome->id,
             'category_id' => $homeCleaning->id,
@@ -132,7 +117,6 @@ class ServiceSeeder extends Seeder
             $deepCleaning->id
         ]);
 
-        // Service 4: Premium Kitchen Deep Clean
         $s4 = Service::create([
             'company_id' => $ecoCleanHome->id,
             'category_id' => $homeCleaning->id,
@@ -153,7 +137,6 @@ class ServiceSeeder extends Seeder
         $s4->requiredSkills()->attach([
             $deepCleaning->id]);
 
-        // Service 5: Elite Villa Cleanup Match
         $s5 = Service::create([
             'company_id' => $ecoCleanHome->id,
             'category_id' => $homeCleaning->id,
@@ -178,11 +161,6 @@ class ServiceSeeder extends Seeder
         ]);
 
 
-        // ==========================================================
-        // 🚗 COMPANY 2: Sparkle Auto Express (Car Wash Services)
-        // ==========================================================
-
-        // Service 6: Quick Outer Eco Wash
         $s6 = Service::create([
             'company_id' => $sparkleAuto->id,
             'category_id' => $carWash->id,
@@ -205,7 +183,6 @@ class ServiceSeeder extends Seeder
             $exterior->id
         ]);
 
-        // Service 7: Full Interior & Exterior Detail
         $s7 = Service::create([
             'company_id' => $sparkleAuto->id,
             'category_id' => $carWash->id,
@@ -222,7 +199,7 @@ class ServiceSeeder extends Seeder
             'discount' => 0.00,
         ]);
         $s7->attributes()->attach([
-            $carSeats->id => ['price' => 5.00, 'duration' => 15], // Price calculated per extra seat
+            $carSeats->id => ['price' => 5.00, 'duration' => 15],
             $bodyWax->id => ['price' => 15.00, 'duration' => 25],
             $engineSteam->id => ['price' => 20.00, 'duration' => 30]
         ]);
@@ -231,7 +208,6 @@ class ServiceSeeder extends Seeder
             $thermalSteam->id
         ]);
 
-        // Service 8: Executive Fabric & Leather Steam
         $s8 = Service::create([
             'company_id' => $sparkleAuto->id,
             'category_id' => $carWash->id,
@@ -253,7 +229,6 @@ class ServiceSeeder extends Seeder
             $thermalSteam->id,
             $exterior->id]);
 
-        // Service 9: Optical Headlight Restoration
         $s9 = Service::create([
             'company_id' => $sparkleAuto->id,
             'category_id' => $carWash->id,

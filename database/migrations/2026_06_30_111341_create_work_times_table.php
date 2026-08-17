@@ -13,7 +13,7 @@ return new class extends Migration {
         Schema::create('work_times', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->onDelete('cascade');
-            $table->tinyInteger('day_of_week'); // 0 = Sunday, ..., 6 = Saturday
+            $table->tinyInteger('day_of_week');
             $table->time('open_at')->nullable();
             $table->time('close_at')->nullable();
             $table->boolean('is_holiday')->default(false);

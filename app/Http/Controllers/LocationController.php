@@ -12,9 +12,7 @@ class LocationController extends Controller
 {
 
     use ApiResponse;
-    /**
-     * Display a listing of the user's locations.
-     */
+   
     public function index()
     {
         $locations = Location::where('user_id', Auth::id())->get();
@@ -22,9 +20,7 @@ class LocationController extends Controller
         return $this->successResponse($locations, 'Locations retrieved successfully');
     }
 
-    /**
-     * Store a newly created location in storage.
-     */
+ 
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -45,12 +41,9 @@ class LocationController extends Controller
         return $this->successResponse($location, 'Location created successfully', 201); 
     }
 
-    /**
-     * Display the specified location.
-     */
+  
     public function show(Location $location)
     {
-        // Ensure the location belongs to the authenticated user
         if ($location->user_id !== Auth::id()) {
             return $this->error('Unauthorized', 403);
         }
@@ -58,12 +51,8 @@ class LocationController extends Controller
         return $this->successResponse($location, 'Location retrieved successfully');
     }
 
-    /**
-     * Update the specified location in storage.
-     */
     public function update(Request $request, Location $location)
     {
-        // Ensure the location belongs to the authenticated user
         if ($location->user_id !== Auth::id()) {
             return $this->error('Unauthorized', 403);
         }
@@ -80,12 +69,8 @@ class LocationController extends Controller
             return $this->successResponse($location, 'Location updated successfully');
         }
 
-    /**
-     * Remove the specified location from storage.
-     */
     public function destroy(Location $location)
     {
-        // Ensure the location belongs to the authenticated user
         if ($location->user_id !== Auth::id()) {
             return $this->error('Unauthorized', 403);
         }
@@ -95,20 +80,17 @@ class LocationController extends Controller
         return $this->successResponse(null, 'Location deleted successfully');
     }
 
-    /**
-     * Get nearest locations based on coordinates.
-     */
     public function nearest(Request $request)
     {
         $request->validate([
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'radius' => 'nullable|numeric|min:1|max:100', // in kilometers
+            'radius' => 'nullable|numeric|min:1|max:100',
         ]);
 
         $latitude = $request->latitude;
         $longitude = $request->longitude;
-        $radius = $request->radius ?? 10; // default 10km
+        $radius = $request->radius ?? 10; 
 
         $locations = Location::selectRaw("
             *,
@@ -136,9 +118,7 @@ class LocationController extends Controller
         ]);
     }
 
-    /**
-     * Get paginated locations for the authenticated user.
-     */
+   
     public function paginated(Request $request)
     {
         $perPage = $request->get('per_page', 15);

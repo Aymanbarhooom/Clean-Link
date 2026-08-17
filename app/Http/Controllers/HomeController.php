@@ -23,7 +23,6 @@ class HomeController extends Controller
 
     public function index(): JsonResponse
     {
-        // 1. Offers: Services sorted by the largest absolute discount amount
         $offersCacheKey = 'homepage_offers';
         $offers = Cache::remember($offersCacheKey, now()->addHours(1), function () {
             return Service::where('discount', '>', 0)
@@ -32,7 +31,6 @@ class HomeController extends Controller
                 ->get();
         });
 
-        // 2. Premium Services: Highest customer rating scores
         $topServicesCacheKey = 'homepage_top_services';
         $topServices = Cache::remember($topServicesCacheKey, now()->addHours(1), function () {
             return Service::orderBy('rating', 'desc')
@@ -40,13 +38,11 @@ class HomeController extends Controller
                 ->get();
         });
 
-        // 3. Categories: First 6 index parameters
         $categoriesCacheKey = 'homepage_categories';
         $categories = Cache::remember($categoriesCacheKey, now()->addHours(1), function () {
             return Category::take(6)->get();
         });
 
-        // 4. Elite Companies: Highest rated corporate brands operating
         $topCompaniesCacheKey = 'homepage_top_companies';
         $topCompanies = Cache::remember($topCompaniesCacheKey, now()->addHours(1), function () {
             return Company::orderBy('rating', 'desc')
@@ -54,7 +50,6 @@ class HomeController extends Controller
                 ->get();
         });
         $topCompanies->load('workTimes');
-        // Aggregate inside a structured layout matching your frontend requirement
         return $this->successResponse([
             'offers' => ServiceResource::collection($offers),
             'services' => ServiceResource::collection($topServices),
@@ -76,11 +71,7 @@ class HomeController extends Controller
     $searchQuery = $request->input('query');
     $regionId = $request->input('region_id');
 
-    /*
-    |--------------------------------------------------------------------------
-    | Regions
-    |--------------------------------------------------------------------------
-    */
+   
 
     $regionsQuery = Region::where(function ($query) use ($searchQuery) {
         $query->where('name_en', 'LIKE', "%{$searchQuery}%")
@@ -93,21 +84,12 @@ class HomeController extends Controller
 
     $regions = $regionsQuery->with('manager')->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Categories
-    |--------------------------------------------------------------------------
-    */
+
 
     $categories = Category::where('name_en', 'LIKE', "%{$searchQuery}%")
         ->orWhere('name_ar', 'LIKE', "%{$searchQuery}%")
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Companies
-    |--------------------------------------------------------------------------
-    */
 
     $companiesQuery = Company::where(function ($query) use ($searchQuery) {
         $query->where('name_en', 'LIKE', "%{$searchQuery}%")
@@ -130,12 +112,6 @@ class HomeController extends Controller
         ->with('workTimes')
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Services
-    |--------------------------------------------------------------------------
-    */
-
     $servicesQuery = Service::query()
         ->where(function ($query) use ($searchQuery) {
             $query->where('name_en', 'LIKE', "%{$searchQuery}%")
@@ -147,12 +123,6 @@ class HomeController extends Controller
             $query->where('region_id', $regionId);
         });
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Price overlap filter
-    |--------------------------------------------------------------------------
-    */
 
     if (
         $request->filled('minimum_price') &&
@@ -170,11 +140,6 @@ class HomeController extends Controller
             ->where('maximum_price', '>=', $userMin);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Rating filter
-    |--------------------------------------------------------------------------
-    */
 
     if ($request->filled('rating')) {
         $servicesQuery->where(
@@ -188,11 +153,7 @@ class HomeController extends Controller
         ->orderByDesc('rating')
         ->get();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Offers
-    |--------------------------------------------------------------------------
-    */
+
 
     $offers = $services
         ->where('discount', '>', 0)

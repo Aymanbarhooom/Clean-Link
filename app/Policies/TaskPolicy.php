@@ -1,6 +1,5 @@
 <?php
 
-// app/Policies/TaskPolicy.php
 namespace App\Policies;
 
 use App\Models\User;
@@ -24,7 +23,6 @@ class TaskPolicy
 
     public function update(User $user, Task $task): bool
     {
-        // Workers mutate the progression state of the task exclusively
         return $user->isWorker() && $user->id === $task->worker_id;
     }
 }

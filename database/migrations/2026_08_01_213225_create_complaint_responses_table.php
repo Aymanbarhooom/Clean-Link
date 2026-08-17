@@ -13,10 +13,9 @@ return new class extends Migration
             $table->foreignId('complaint_id')->constrained('complaints')->onDelete('cascade');
             $table->foreignId('responder_id')->constrained('users')->onDelete('cascade');
             $table->text('response');
-            $table->boolean('is_internal')->default(false); // للتمييز بين الردود الداخلية والخارجية
+            $table->boolean('is_internal')->default(false); 
             $table->timestamps();
             
-            // Indexes for performance
             $table->index(['complaint_id', 'created_at']);
         });
     }

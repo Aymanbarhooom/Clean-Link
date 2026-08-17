@@ -22,7 +22,6 @@ class CategoryResource extends JsonResource
             'description' => $this->{"description_$lang"},
             'image' => $this->image,
 
-            // لن تظهر إلا إذا استدعيت $category->load('services') في الـ Show
             'services' => ServiceResource::collection($this->whenLoaded('services')),
 
             'created_at' => $this->created_at,

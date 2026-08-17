@@ -83,9 +83,7 @@ public function unreadComplaints()
 
     // --- Helper Functions ---
 
-    /**
-     * Instantly check if the shop is physically operating right now
-     */
+    
     public function isCurrentlyOperating(): bool
     {
         if (!$this->is_open)

@@ -99,8 +99,7 @@ class WorkgroupController extends Controller
             'worker_ids.*' => 'required|exists:users,id',
         ]);
 
-        // Ensure none of the provided workers (including leader) are already
-        // assigned to another workgroup. Use the User->workgroups relation.
+        
         $allStaff = array_unique(array_merge([$validated['leader_id']], $validated['worker_ids']));
 
         $alreadyAssigned = User::whereIn('id', $allStaff)
@@ -118,15 +117,13 @@ class WorkgroupController extends Controller
 
         $workgroup = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $allStaff) {
             
-            // Build parent record
             $workgroup = Workgroup::create([
                 'company_id' => $validated['company_id'],
                 'name' => $validated['name'],
                 'leader_id' => $validated['leader_id'],
             ]);
 
-            // Sync structural staff identities to the many-to-many pivot loop
-            // Automatically includes the leader inside the crew membership listing
+
             $workgroup->workers()->sync($allStaff);
 
             return $workgroup;
@@ -139,10 +136,6 @@ class WorkgroupController extends Controller
         );
     }
 
-    /**
-     * Modify or re-balance existing workgroup structures cleanly.
-     * Route: PUT /api/workgroups/{workgroup}
-     */
     public function update(Request $request, Workgroup $workgroup): JsonResponse
     {
         if (auth()->user()->id !== $workgroup->company->manager_id) {
@@ -174,10 +167,7 @@ class WorkgroupController extends Controller
         );
     }
 
-    /**
-     * Wipe a workgroup from the registry index.
-     * Route: DELETE /api/workgroups/{workgroup}
-     */
+   
     public function destroy(Workgroup $workgroup): JsonResponse
     {
         if (auth()->user()->id !== $workgroup->company->manager_id) {

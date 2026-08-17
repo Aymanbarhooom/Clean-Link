@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/SkillSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Skill;
@@ -11,7 +10,6 @@ class SkillSeeder extends Seeder
     public function run(): void
     {
         $skills = [
-            // --- 🏠 Home & Residential Specialized Skills ---
             [
                 'name_ar' => 'التنظيف السكني القياسي',
                 'name_en' => 'Standard Residential Cleaning',
@@ -41,7 +39,6 @@ class SkillSeeder extends Seeder
                 'name_en' => 'Window Washing & Exterior Glass Wiping',
             ],
 
-            // --- 🛋️ Fabric Upholstery, Curtains & Rug Care Skills ---
             [
                 'name_ar' => 'غسيل وتنظيف السجاد بآلات السحب والضغط',
                 'name_en' => 'Carpet & Rug Hot-Water Extraction',
@@ -59,7 +56,6 @@ class SkillSeeder extends Seeder
                 'name_en' => 'Hanging Curtain Steam Cleansing',
             ],
 
-            // --- 🚗 Automotive Care & Detailing Specialist Skills ---
             [
                 'name_ar' => 'غسيل وتلميع السيارات الخارجي (الهيدرو-بخار)',
                 'name_en' => 'Exterior Hydro-Steam Vehicle Washing',
@@ -81,7 +77,6 @@ class SkillSeeder extends Seeder
                 'name_en' => 'Headlight Acrylic Restoration & Clarity Polishing',
             ],
 
-            // --- 🏊 Commercial Property & Premium Addon Skills ---
             [
                 'name_ar' => 'تنظيف وتعقيم المكاتب والمساحات المشتركة للشركات',
                 'name_en' => 'Commercial Office & Corporate Cleaning',

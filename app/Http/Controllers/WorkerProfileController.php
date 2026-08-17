@@ -19,9 +19,7 @@ class WorkerProfileController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    /**
-     * View structural worker records showing linked users metrics.
-     */
+  
     public function show(User $worker): JsonResponse
     {
         $worker = auth()->user();
@@ -41,7 +39,6 @@ class WorkerProfileController extends Controller
 
     public function evaluateWorker(Request $request): JsonResponse
 {
-    // 1. Correct validation syntax
     $validated = $request->validate([
         'worker_id' => 'required|integer|exists:users,id',
         'rating'    => 'nullable|numeric|min:0|max:5',
@@ -49,25 +46,21 @@ class WorkerProfileController extends Controller
 
     $manager = auth()->user();
     
-    // 2. Get all IDs of companies managed by this user
     $managedCompanyIds = $manager->managedCompanies()->pluck('id')->toArray();
 
     if (empty($managedCompanyIds)) {
         return $this->errorResponse('You do not manage any companies', 403);
     }
 
-    // 3. Find the profile and ensure it belongs to one of the manager's companies
     $profile = WorkerProfile::where('user_id', $validated['worker_id'])
-        ->whereIn('company_id', $managedCompanyIds) // Restricts search to authorized companies
-        ->with(['user.profile', 'skills', 'user.workgroups']) // Prevents N+1 database performance hits
+        ->whereIn('company_id', $managedCompanyIds) 
+        ->with(['user.profile', 'skills', 'user.workgroups']) 
         ->first();
 
-    // 4. Secure check: Fail if worker doesn't exist or belongs to another company
     if (!$profile) {
         return $this->errorResponse('Worker profile not found within your managed companies', 422);
     }
 
-    // 5. Explicitly update and save the database record
     if (array_key_exists('rating', $validated)) {
         $profile->rating = $validated['rating'];
         $profile->save();
@@ -76,9 +69,6 @@ class WorkerProfileController extends Controller
     return $this->successResponse($profile, 'Worker evaluation updated successfully');
 }
 
-    /**
-     * Modify targeted structural experience attributes.
-     */
     public function update(Request $request): JsonResponse
     {
         $worker = auth()->user();
@@ -96,7 +86,6 @@ class WorkerProfileController extends Controller
             'status' => 'nullable|string|in:available,off',
         ]);
 
-        // 1. Prepare User Data (فقط إذا كان الحقل يحتوي على قيمة)
         $userData = [];
         if ($request->filled('fullname')) {
             $userData['fullname'] = $validated['fullname'];
@@ -105,7 +94,6 @@ class WorkerProfileController extends Controller
             $userData['email'] = $validated['email'];
         }
 
-        // 2. Prepare Profile Data
         $profileData = [];
         if ($request->filled('phone')) {
             $profileData['phone'] = $validated['phone'];
@@ -117,7 +105,6 @@ class WorkerProfileController extends Controller
             $profileData['image'] = $request->file('image')->store('worker_profiles', 'public');
         }
 
-        // 3. Prepare Worker Profile Data
         $workerProfileData = [];
         if ($request->filled('experience_years')) {
             $workerProfileData['experience_years'] = $validated['experience_years'];
@@ -126,7 +113,6 @@ class WorkerProfileController extends Controller
             $workerProfileData['status'] = $validated['status'];
         }
 
-        // 4. Perform Updates conditionally
         if (!empty($userData)) {
             $worker->update($userData);
         }
@@ -148,10 +134,6 @@ class WorkerProfileController extends Controller
     }
 
 
-    /**
-     * Attach multiple operational skills to a specific field worker.
-     * Route: POST /api/workers/{worker}/skills
-     */
     public function attachSkills(Request $request): JsonResponse
     {
         $worker = auth()->user();
@@ -164,7 +146,6 @@ class WorkerProfileController extends Controller
             'skill_ids.*' => 'required|integer|exists:skills,id',
         ]);
 
-        // Access the workerProfile model extension directly to bridge the pivot table relation mapping
         $worker->workerProfile->skills()->syncWithoutDetaching($validated['skill_ids']);
 
         return $this->successResponse(
@@ -185,7 +166,6 @@ class WorkerProfileController extends Controller
             'skill_ids.*' => 'required|integer|exists:skills,id',
         ]);
 
-        // Access the workerProfile model extension directly to bridge the pivot table relation mapping
         $worker->workerProfile->skills()->detach($validated['skill_ids']);
 
         return $this->successResponse(

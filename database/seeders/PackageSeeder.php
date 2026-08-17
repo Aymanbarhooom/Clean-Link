@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/PackageSeeder.php
 namespace Database\Seeders;
 
 use App\Models\Service;
@@ -15,7 +14,6 @@ class PackageSeeder extends Seeder
         $homeCleaning = Category::where('name_en', 'Home Cleaning')->orWhere('name_en', 'Home')->first();
         $carWash = Category::where('name_en', 'Car Detailing & Wash')->orWhere('name_en', 'Car')->first();
 
-        // Retrieve all 10 pre-seeded corporate services
         $services = Service::all();
 
         foreach ($services as $service) {
@@ -34,10 +32,8 @@ class PackageSeeder extends Seeder
             ]
         );
             
-            // Check if the parent company or service links to the Residential Cleaning Vertical
             if ($service->category_id === $homeCleaning?->id || $service->company?->category_id === $homeCleaning?->id) {
                 
-                // Package 1: Studio Layout
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الاستوديو',
@@ -56,7 +52,6 @@ class PackageSeeder extends Seeder
                     'minimum_workers' => 2,
                 ]);
 
-                // Package 2: Standard Flat Layout
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الشقة القياسية',
@@ -77,7 +72,6 @@ class PackageSeeder extends Seeder
                     'minimum_workers' => 3,
                 ]);
 
-                // Package 3: Premium Multi-Story Building
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'باقة الدوبلكس والمباني الكاملة',
@@ -99,10 +93,8 @@ class PackageSeeder extends Seeder
                 ]);
 
             } 
-            // Otherwise apply the automotive caravan tracking configuration details layout
             elseif ($service->category_id === $carWash?->id || $service->company?->category_id === $carWash?->id) {
                 
-                // Package 1: Small Sedan Frame
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'فئة السيدان والهاتشباك',
@@ -123,7 +115,6 @@ class PackageSeeder extends Seeder
                     'minimum_workers' => 4,
                 ]);
 
-                // Package 2: Standard SUV Setup
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'فئة السيارات العائلية والكروس أوفر (SUV)',
@@ -144,7 +135,6 @@ class PackageSeeder extends Seeder
                     'minimum_workers' => 3,
                 ]);
 
-                // Package 3: Commercial Van or Luxury Elite Truck
                 Package::create([
                     'service_id' => $service->id,
                     'name_ar' => 'الفئة النخبوية للشاحنات والسيارات الفان الكبيرة',

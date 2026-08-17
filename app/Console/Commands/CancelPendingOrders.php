@@ -20,7 +20,6 @@ class CancelPendingOrders extends Command
                        ->get();
         foreach ($orders as $order) {
             $order->update(['status' => 'cancelled']);
-            // يمكنك إضافة حدث أو إشعار هنا
         }
         $this->info("تم إلغاء {$orders->count()} طلب.");
     }

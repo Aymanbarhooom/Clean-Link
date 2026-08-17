@@ -29,7 +29,6 @@ class TaskController extends Controller
             return $this->errorResponse('Access restricted to field workers', 403);
         }
 
-        // جلب المهام التي تنتمي لأي ورشة يكون المستخدم الحالي عضواً فيها
         $tasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })
@@ -63,7 +62,6 @@ class TaskController extends Controller
         $user = auth()->user();
         $workers = $task->workgroup->workers;
 
-        // 1. FIXED: Correctly load the order's specific client and their FCM tokens
         $order = $task->order;
         $client = $order->client;
         $client->load('fcmTokens');
@@ -74,8 +72,8 @@ class TaskController extends Controller
 
         $validated = $request->validate([
             'status' => 'required|in:pending,on_way,handling,done',
-            'image_before' => 'nullable|image|max:2048', // 2MB
-            'image_after' => 'nullable|image|max:2048', // 2MB
+            'image_before' => 'nullable|image|max:2048', 
+            'image_after' => 'nullable|image|max:2048',  
         ]);
 
         if ($request->hasFile('image_before')) {

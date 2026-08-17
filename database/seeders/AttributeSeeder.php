@@ -11,7 +11,6 @@ class AttributeSeeder extends Seeder
     public function run(): void
     {
         $attributes = [
-            // --- 🏠 Home & Residential Cleaning Attributes ---
             [
                 'name_ar' => 'عدد الغرف الإضافية',
                 'name_en' => 'Number of Extra Rooms',
@@ -158,7 +157,6 @@ class AttributeSeeder extends Seeder
                 'type' => 'boolean',
             ],
 
-            // --- 🛋️ Furniture, Carpets & Fabric Upholstery Attributes ---
             [
                 'name_ar' => 'عدد السجاد المراد غسيله',
                 'name_en' => 'Number of Carpets / Rugs',
@@ -177,10 +175,9 @@ class AttributeSeeder extends Seeder
             [
                 'name_ar' => 'غسيل وتعقيم الستائر بالبخار وهي معلقة',
                 'name_en' => 'Steam Curtain Cleaning (Hanging)',
-                'type' => 'number', // Per curtain item unit calculation
+                'type' => 'number',
             ],
 
-            // --- 🏢 Commercial, Offices & Facilities Attributes ---
             [
                 'name_ar' => 'عدد المكاتب / الطاولات الإضافية',
                 'name_en' => 'Number of Extra Desks / Workstations',
@@ -197,7 +194,6 @@ class AttributeSeeder extends Seeder
                 'type' => 'boolean',
             ],
 
-            // --- 🏊 Yard, Pools & Outdoor Property Attributes ---
             [
                 'name_ar' => 'تنظيف وتعقيم حوض السباحة (المسبح)',
                 'name_en' => 'Swimming Pool Cleaning & Balancing',
@@ -219,7 +215,6 @@ class AttributeSeeder extends Seeder
                 'type' => 'boolean',
             ],
 
-            // --- 🧼 Specialized & Premium Addons ---
             [
                 'name_ar' => 'تطهير وتعقيم كامل ضد الفيروسات والبكتيريا',
                 'name_en' => 'Complete Anti-Viral & Bacterial Sanitization Fogging',

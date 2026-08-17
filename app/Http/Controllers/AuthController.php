@@ -32,17 +32,14 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        // توليد كود OTP بسيط (مثلاً 6 أرقام)
         $otpCode = rand(100000, 999999);
 
-        // حفظ الـ OTP في الجدول
         EmailVerification::create([
             'email' => $validated['email'],
             'otp_code' => $otpCode,
             'expires_at' => Carbon::now()->addMinutes(10),
         ]);
 
-        // إرسال الإيميل
         Mail::to($validated['email'])->send(new OtpMail($otpCode, $validated['fullname']));
 
         return $this->successResponse([
@@ -59,7 +56,6 @@ class AuthController extends Controller
             'otp_code' => 'required|digits:6',
         ]);
 
-        // البحث عن سجل الـ OTP
         $verification = EmailVerification::where('email', $validated['email'])
             ->where('otp_code', $validated['otp_code'])
             ->where('is_used', false)
@@ -69,15 +65,12 @@ class AuthController extends Controller
             return $this->errorResponse('Invalid OTP code', 400);
         }
 
-        // التحقق من انتهاء الصلاحية
         if ($verification->expires_at->isPast()) {
             return $this->errorResponse('OTP code has expired', 400);
         }
 
-        // تعليم الـ OTP أنه تم استخدامه
         $verification->update(['is_used' => true]);
 
-        // إنشاء المستخدم فعلياً
         $user = User::create([
             'fullname' => $validated['fullname'],
             'email' => $validated['email'],
@@ -102,27 +95,22 @@ class AuthController extends Controller
         'email' => 'required|string|email|max:255',
     ]);
 
-    // تأكد أن الإيميل غير موجود في جدول users (يعني لم يُسجّل بعد)
     if (\App\Models\User::where('email', $validated['email'])->exists()) {
         return $this->errorResponse('This email is already registered', 400);
     }
 
-    // احذف أي OTP قديم غير مستخدم
     EmailVerification::where('email', $validated['email'])
         ->where('is_used', false)
         ->delete();
 
-    // توليد كود جديد
     $otpCode = rand(100000, 999999);
 
-    // إنشاء سجل جديد
     EmailVerification::create([
         'email' => $validated['email'],
         'otp_code' => $otpCode,
         'expires_at' => Carbon::now()->addMinutes(10),
     ]);
 
-    // إرسال الإيميل
     Mail::to($validated['email'])->send(new OtpMail($otpCode, $validated['fullname']));
 
     return $this->successResponse([
@@ -132,7 +120,6 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        // 1. التحقق من البيانات المدخلة
         $validated = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
@@ -164,10 +151,7 @@ class AuthController extends Controller
         $user = $request->user()->load(['profile', 'workerProfile', 'fcmTokens']);
         return $this->successResponse($user, 'Current user profile metrics retrieved');
     }
-    /**
-     * Refresh or store the device Firebase Cloud Messaging (FCM) Token context.
-     * Route endpoint: POST /api/auth/fcm-token
-     */
+  
     public function updateFcmToken(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -190,10 +174,7 @@ class AuthController extends Controller
         return $this->successResponse($tokenRecord, 'FCM device token synced successfully');
     }
 
-    /**
-     * Update Account Profile Information (User + Profile Models)
-     * Route: PUT /api/auth/profile/update
-     */
+    
     public function updateProfile(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -210,13 +191,11 @@ class AuthController extends Controller
             $validated['image'] = $path;
         }
 
-        // Update core user records
         $user->update([
             'fullname' => $validated['fullname'],
             'email' => $validated['email'],
         ]);
 
-        // Update linked profile parameters
         $user->profile()->update([
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
@@ -229,20 +208,15 @@ class AuthController extends Controller
         );
     }
 
-    /**
-     * Secure and isolated password modification endpoint
-     * Route: POST /api/auth/profile/change-password
-     */
     public function changePassword(Request $request): JsonResponse
     {
         $user = auth()->user();
 
         $validated = $request->validate([
             'old_password' => 'required',
-            'new_password' => 'required|string|min:8|confirmed', // Requires 'new_password_confirmation' from frontend
+            'new_password' => 'required|string|min:8|confirmed', 
         ]);
 
-        // Validate the historical password mapping match
         if (!Hash::check($validated['old_password'], $user->password)) {
             return $this->errorResponse('The current password you entered is incorrect', 422);
         }

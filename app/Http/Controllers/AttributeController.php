@@ -16,14 +16,10 @@ class AttributeController extends Controller
 
     public function __construct()
     {
-        // Enforce sanctum authentication for all actions
         $this->middleware('auth:sanctum');
     }
 
-    /**
-     * Display a listing of all global attributes.
-     * Useful for Company Managers when setting up custom prices.
-     */
+    
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -36,12 +32,9 @@ class AttributeController extends Controller
         return $this->successResponse(AttributeResource::collection($attributes), 'Global attribute dictionary retrieved successfully');
     }
 
-    /**
-     * Add a new global attribute to the system dictionary (Admin Only).
-     */
+    
     public function store(Request $request): JsonResponse
     {
-        // Enforce administrative actor validation
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
@@ -57,17 +50,13 @@ class AttributeController extends Controller
         return $this->successResponse($attribute, 'New global attribute added successfully to the dictionary', 211);
     }
 
-    /**
-     * Remove a global attribute from the system dictionary (Admin Only).
-     */
+    
     public function destroy(AttributeModel $attribute): JsonResponse
     {
-        // Enforce administrative actor validation
         if (!auth()->user()->isAdmin()) {
             return $this->errorResponse('Access restricted to administrative accounts only', 403);
         }
 
-        // Deleting this will automatically cascade and clean up entries in the 'attribute_service' table
         $attribute->delete();
 
         return $this->successResponse([], 'Global attribute permanently removed from the system dictionary');

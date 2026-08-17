@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('company_id')->constrained('companies')->onDelete('cascade');
             $table->string('name');
-            $table->foreignId('leader_id')->constrained('users')->onDelete('cascade'); // The Worker Team Leader
+            $table->foreignId('leader_id')->constrained('users')->onDelete('cascade'); 
             $table->timestamps();
         });
         Schema::create('user_workgroup', function (Blueprint $table) {
