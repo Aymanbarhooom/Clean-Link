@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
@@ -26,7 +27,7 @@ class Order extends Model
         'payment_status',
         'stripe_payment_intent_id',
         'admin_share',
-        'company_share', 
+        'company_share',
         'is_done_with_admin',
         'is_company_paid',
     ];
@@ -79,6 +80,17 @@ class Order extends Model
         $this->update(['total_price' => $basePrice + $addonsPrice]);
     }
 
+    // أضف هذه الدالة داخل class Order
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function latestPayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
     public function isAssigned(): bool
     {
         return $this->status === 'assigned_to_worker';
@@ -88,10 +100,10 @@ class Order extends Model
         return $this->end_time->copy()->addMinutes($this->travel_buffer_minutes);
     }
     public function calculateAndSetPaymentShares(): void
-{
-    $this->update([
-        'admin_share' => round($this->total_price * 0.10, 2),
-        'company_share' => round($this->total_price * 0.90, 2),
-    ]);
-}
+    {
+        $this->update([
+            'admin_share' => round($this->total_price * 0.10, 2),
+            'company_share' => round($this->total_price * 0.90, 2),
+        ]);
+    }
 }

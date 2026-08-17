@@ -45,6 +45,9 @@ class StripeWebhookController extends Controller
                 case 'charge.succeeded':
                     if ($order->payment_method === 'electric' && $object->status === 'requires_capture') {
                         $order->update(['payment_status' => 'held']);
+                        $order->payments()->latest()->update([
+                            'payment_status' => 'held'
+                        ]);
                         Log::info("Order #{$order->id} payment status updated to 'held'.");
                     }
                     break;

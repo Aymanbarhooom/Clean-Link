@@ -242,6 +242,21 @@ Route::middleware('auth:sanctum')->group(function () {
         '/payments/create-intent',
         [PaymentController::class, 'createPaymentIntent']
     );
+
+    Route::get('payments', [PaymentController::class, 'index']);
+    Route::get('payments/{id}', [PaymentController::class, 'show']);
+
+    // إحصائيات مدير الشركة والرسم البياني
+    Route::get('company-manager/payments/analytics', [PaymentController::class, 'companyAnalytics']);
+    Route::get('companies/{company}/payments/revenue-chart', [PaymentController::class, 'companyRevenueChart']);
+
+    // إحصائيات الأدمن
+    Route::prefix('admin/payments')->group(function () {
+        Route::get('companies-statistics', [PaymentController::class, 'adminCompaniesStats']);
+        Route::get('regions-statistics', [PaymentController::class, 'adminRegionsStats']);
+        Route::get('services-statistics', [PaymentController::class, 'adminServicesStats']);
+        Route::get('{payment}', [PaymentController::class, 'adminShowPayment']);
+    });
 });
 
 

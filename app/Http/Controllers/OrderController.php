@@ -409,6 +409,7 @@ class OrderController extends Controller
         }
 
         $order = DB::transaction(function () use ($validated, $package, $startTime, $effectiveEndTime, $totalDuration, $travelBufferMinutes, $totals, $pivotPayload) {
+            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -430,6 +431,15 @@ class OrderController extends Controller
                     : 'held',
                 'is_done_with_admin' => false,
                 'is_company_paid' => $validated['payment_method'] === 'manual',
+            ]);
+
+            $order->payments()->create([
+                'user_id' => auth()->id(),
+                'amount' => $order->total_price,
+                'currency' => 'usd',
+                'payment_method' => $validated['payment_method'],
+                'payment_status' => $paymentStatus,
+                'paid_at' => $validated['payment_method'] === 'cash' ? now() : null,
             ]);
 
             $order->calculateAndSetPaymentShares();
@@ -647,6 +657,7 @@ class OrderController extends Controller
             $attributeTotals,
             $pivotPayload
         ) {
+            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -675,6 +686,15 @@ class OrderController extends Controller
                 'is_done_with_admin' => false,
 
                 'is_company_paid' => $validated['payment_method'] === 'manual',
+            ]);
+
+            $order->payments()->create([
+                'user_id' => auth()->id(),
+                'amount' => $order->total_price,
+                'currency' => 'usd',
+                'payment_method' => $validated['payment_method'],
+                'payment_status' => $paymentStatus,
+                'paid_at' => $validated['payment_method'] === 'cash' ? now() : null,
             ]);
 
             /*
@@ -851,45 +871,49 @@ class OrderController extends Controller
 
 
     public function cancel(Order $order): JsonResponse
-{
-    $user = auth()->user();
-    $this->authorize('cancel', $order);
+    {
+        $user = auth()->user();
+        $this->authorize('cancel', $order);
 
-    if ($order->status == 'canceled') {
-        return $this->errorResponse('This order has already been canceled', 422);
-    } elseif ($order->status == 'completed' || $order->status == 'in_progress') {
-        return $this->errorResponse('This order cannot be canceled', 422);
-    }
-
-    // معالجة إلغاء الدفع أو الاسترجاع في Stripe للطلبات الإلكترونية
-    if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
-        try {
-            $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
-
-            // 1. إذا كان المبلغ محجوزاً فقط، نلغي الحجز
-            if ($order->payment_status === 'held') {
-                $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
-                $order->update(['payment_status' => 'refunded']);
-            }
-            // 2. إذا كان المبلغ قد اقتُطع بالفعل، نردّه للعميل
-            elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
-                $stripe->refunds->create([
-                    'payment_intent' => $order->stripe_payment_intent_id,
-                ]);
-                $order->update(['payment_status' => 'refunded']);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Stripe Refund/Cancel Failed for Order #' . $order->id . ': ' . $e->getMessage());
+        if ($order->status == 'canceled') {
+            return $this->errorResponse('This order has already been canceled', 422);
+        } elseif ($order->status == 'completed' || $order->status == 'in_progress') {
+            return $this->errorResponse('This order cannot be canceled', 422);
         }
+
+        // معالجة إلغاء الدفع أو الاسترجاع في Stripe للطلبات الإلكترونية
+        if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
+            try {
+                $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+
+                // 1. إذا كان المبلغ محجوزاً فقط، نلغي الحجز
+                if ($order->payment_status === 'held') {
+                    $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
+                    $order->update(['payment_status' => 'refunded']);
+                }
+                // 2. إذا كان المبلغ قد اقتُطع بالفعل، نردّه للعميل
+                elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
+                    $stripe->refunds->create([
+                        'payment_intent' => $order->stripe_payment_intent_id,
+                    ]);
+                    $order->update(['payment_status' => 'refunded']);
+                    // تحديث سجل الـ Payment إلى refunded عند إلغاء الطلب
+                    $order->payments()->latest()->update([
+                        'payment_status' => 'refunded'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Stripe Refund/Cancel Failed for Order #' . $order->id . ': ' . $e->getMessage());
+            }
+        }
+
+        $order->update(['status' => 'canceled']);
+        $order->tasks()->delete();
+
+        $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
+
+        return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
     }
-
-    $order->update(['status' => 'canceled']);
-    $order->tasks()->delete();
-
-    $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile']);
-
-    return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
-}
 
     public function index(Request $request): JsonResponse
     {
@@ -912,17 +936,17 @@ class OrderController extends Controller
 
         if (! $this->applyOrderVisibilityScope($query, $user)) {
             return $this->successResponse([
-                    'data' => [],
-                    'pagination' => [
-                        'current_page' => 1,
-                        'per_page' => $perPage,
-                        'total' => 0,
-                        'last_page' => 1,
-                        'from' => null,
-                        'to' => null,
-                        'has_more_pages' => false,
-                    ]
-                ], 'No company registered');
+                'data' => [],
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                    'from' => null,
+                    'to' => null,
+                    'has_more_pages' => false,
+                ]
+            ], 'No company registered');
         }
 
         if (!empty($validated['status'])) {
