@@ -15,6 +15,7 @@ class Complaint extends Model
         'body',
         'is_read',
         'read_at',
+        'client_read_at',
         'complaintable_id',
         'complaintable_type'
     ];
@@ -22,8 +23,10 @@ class Complaint extends Model
     protected $casts = [
         'is_read' => 'boolean',
         'read_at' => 'datetime',
+        'client_read_at' => 'datetime',
     ];
 
+    // Relationships
     public function client(): BelongsTo
     {
         return $this->belongsTo(User::class, 'client_id');
@@ -44,6 +47,7 @@ class Complaint extends Model
         return $this->hasOne(ComplaintResponse::class)->latest();
     }
 
+    // Scopes
     public function scopeUnread($query)
     {
         return $query->where('is_read', false);
@@ -64,6 +68,7 @@ class Complaint extends Model
         return $query->where('complaintable_type', Service::class);
     }
 
+    // Mark as read
     public function markAsRead(): void
     {
         $this->update([
@@ -72,6 +77,7 @@ class Complaint extends Model
         ]);
     }
 
+    // Mark as unread
     public function markAsUnread(): void
     {
         $this->update([
@@ -80,11 +86,13 @@ class Complaint extends Model
         ]);
     }
 
+    // Check if complaint has responses
     public function hasResponses(): bool
     {
         return $this->responses()->exists();
     }
 
+    // Get external responses only (for client)
     public function getExternalResponses()
     {
         return $this->responses()->where('is_internal', false)->get();

@@ -13,11 +13,14 @@ use App\Traits\ApiResponse;
 class ComplaintController extends Controller
 {
     use ApiResponse;
-    
+    /**
+     * Store a new complaint
+     */
     public function store(Request $request): JsonResponse
     {
         $user = auth()->user();
-        
+
+        // Only clients can create complaints
         if ($user->role !== 'client') {
             return $this->errorResponse('Only clients are authorized to submit complaints', 403);
         }
@@ -36,12 +39,14 @@ class ComplaintController extends Controller
             return $this->errorResponse('Target entity not found', 404);
         }
 
+        // التحقق من أن العميل استخدم الخدمة/الشركة
         $hasUsed = $this->checkClientUsage($user, $validated['type'], $complaintableEntity);
 
         if (!$hasUsed) {
             return $this->errorResponse('You can only complain about services/companies you have used', 403);
         }
 
+        // التحقق من عدم وجود شكوى مكررة لنفس العنصر
         $existingComplaint = Complaint::where('client_id', $user->id)
             ->where('complaintable_type', $modelClass)
             ->where('complaintable_id', $complaintableEntity->id)
@@ -52,6 +57,7 @@ class ComplaintController extends Controller
             return $this->errorResponse('You have already submitted a similar complaint about this item', 409);
         }
 
+        // Create the complaint
         $complaint = new Complaint([
             'client_id' => $user->id,
             'title' => $validated['title'],
@@ -68,7 +74,9 @@ class ComplaintController extends Controller
         );
     }
 
-
+    /**
+     * Get complaints with role-based filtering
+     */
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -127,37 +135,47 @@ class ComplaintController extends Controller
         ], 'Complaints fetched successfully');
     }
 
+    /**
+     * Get a single complaint
+     */
    public function show(Request $request, Complaint $complaint): JsonResponse
     {
         $user = auth()->user();
 
+        // Check authorization
         if (!$this->canViewComplaint($user, $complaint)) {
             return $this->errorResponse('Unauthorized to view this complaint', 403);
         }
 
+        // Mark as read if viewing as admin or company manager
         if ($user->isAdmin() || $user->isCompanyManager()) {
             if (!$complaint->is_read) {
                 $complaint->markAsRead();
             }
         }
 
+        // Load relationships with responses
         $complaint->load([
             'client.profile',
             'complaintable',
         ]);
 
+        // Load responses based on user role
         if ($user->role === 'client') {
+            // Clients see only external responses
             $complaint->load(['responses' => function ($query) {
                 $query->where('is_internal', false)
                     ->with(['responder.profile'])
                     ->orderBy('created_at', 'asc');
             }]);
         } else {
+            // Admins and managers see all responses
             $complaint->load(['responses' => function ($query) {
                     $query->orderBy('created_at', 'asc');
             }]);
         }
 
+        // Add statistics
         $responseData = [
             'complaint' => $complaint,
             'statistics' => [
@@ -171,14 +189,19 @@ class ComplaintController extends Controller
         return $this->successResponse($responseData, 'Complaint details fetched successfully');
     }
 
+    /**
+     * Update a complaint (only client can update their own)
+     */
     public function update(Request $request, Complaint $complaint): JsonResponse
     {
         $user = auth()->user();
 
+        // Only the client who created the complaint can update it
         if ($complaint->client_id !== $user->id) {
             return $this->errorResponse('You can only update your own complaints', 403);
         }
 
+        // Only allow updating if not yet read by admin/manager
         if ($complaint->is_read) {
             return $this->errorResponse('This complaint has already been read and cannot be modified', 403);
         }
@@ -196,10 +219,14 @@ class ComplaintController extends Controller
         );
     }
 
+    /**
+     * Delete a complaint
+     */
     public function destroy(Request $request, Complaint $complaint): JsonResponse
     {
         $user = auth()->user();
 
+        // Only the client who created it or admin can delete
         if ($complaint->client_id !== $user->id && !$user->isAdmin()) {
             return $this->errorResponse('Unauthorized to delete this complaint', 403);
         }
@@ -209,7 +236,9 @@ class ComplaintController extends Controller
         return $this->successResponse(null, 'Complaint deleted successfully');
     }
 
-    
+    /**
+     * Mark a complaint as read (for admin/manager)
+     */
     public function markAsRead(Complaint $complaint): JsonResponse
     {
         $user = auth()->user();
@@ -218,6 +247,7 @@ class ComplaintController extends Controller
             return $this->errorResponse('Only admins and company managers can mark complaints as read', 403);
         }
 
+        // Check if company manager has access to this complaint
         if ($user->isCompanyManager() && !$this->canManagerAccessComplaint($user, $complaint)) {
             return $this->errorResponse('You do not have access to this complaint', 403);
         }
@@ -230,7 +260,9 @@ class ComplaintController extends Controller
         );
     }
 
-  
+    /**
+     * Mark a complaint as unread (for admin/manager)
+     */
     public function markAsUnread(Complaint $complaint): JsonResponse
     {
         $user = auth()->user();
@@ -239,6 +271,7 @@ class ComplaintController extends Controller
             return $this->errorResponse('Only admins and company managers can mark complaints as unread', 403);
         }
 
+        // Check if company manager has access to this complaint
         if ($user->isCompanyManager() && !$this->canManagerAccessComplaint($user, $complaint)) {
             return $this->errorResponse('You do not have access to this complaint', 403);
         }
@@ -251,11 +284,13 @@ class ComplaintController extends Controller
         );
     }
 
-   
+    /**
+     * Get unread complaints count
+     */
     public function unreadCount(): JsonResponse
     {
         $user = auth()->user();
-        
+
         $count = $this->getUnreadComplaintsCount($user);
 
         return $this->successResponse([
@@ -263,6 +298,7 @@ class ComplaintController extends Controller
         ], 'Unread complaints count fetched successfully');
     }
 
+    // ============ Helper Methods ============
 
     private function checkClientUsage(User $user, string $type, $complaintableEntity): bool
     {
@@ -307,7 +343,7 @@ class ComplaintController extends Controller
         }
 
         $companyIds = $user->managedCompanies()->pluck('id');
-        
+
         return Complaint::where('id', $complaint->id)
             ->whereHas('complaintable', function ($q) use ($companyIds) {
                 $q->whereIn('company_id', $companyIds);
@@ -328,7 +364,7 @@ class ComplaintController extends Controller
                     'service' => Complaint::where('complaintable_type', Service::class)->count(),
                 ],
             ];
-        } 
+        }
         elseif ($user->isCompanyManager()) {
             $companyIds = $user->managedCompanies()->pluck('id');
             $stats = [
@@ -347,7 +383,7 @@ class ComplaintController extends Controller
         elseif ($user->role === 'client') {
             $stats = [
                 'total' => Complaint::where('client_id', $user->id)->count(),
-                'unread' => 0,
+                'unread' => 0, // Clients don't have unread status
             ];
         }
 
@@ -364,7 +400,7 @@ class ComplaintController extends Controller
 
         if ($user->isCompanyManager()) {
             $companyIds = $user->managedCompanies()->pluck('id');
-            
+
             if ($companyIds->isEmpty()) {
                 return 0;
             }
@@ -382,6 +418,7 @@ class ComplaintController extends Controller
 
     private function applyFilters(Request $request, $query): void
     {
+        // Filter by type (company/service)
         if ($request->has('type')) {
             $type = $request->type;
             if ($type === 'company') {
@@ -391,6 +428,7 @@ class ComplaintController extends Controller
             }
         }
 
+        // Filter by read/unread
         if ($request->has('status')) {
             if ($request->status === 'read') {
                 $query->where('is_read', true);
@@ -399,6 +437,7 @@ class ComplaintController extends Controller
             }
         }
 
+        // Filter by date range
         if ($request->has('from_date')) {
             $query->whereDate('created_at', '>=', $request->from_date);
         }
@@ -406,6 +445,7 @@ class ComplaintController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
+        // Search by title or body
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -414,10 +454,11 @@ class ComplaintController extends Controller
             });
         }
 
+        // Dynamic sorting
         $sortBy = $request->get('sort_by', 'created_at');
         $sortOrder = $request->get('sort_order', 'desc');
         $allowedSorts = ['created_at', 'title', 'is_read'];
-        
+
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder);
         }
@@ -436,6 +477,7 @@ class ComplaintController extends Controller
         ];
     }
 
+    // ============ Error Response Helper ============
     private function errorResponse(string $message, int $statusCode): JsonResponse
     {
         return response()->json([
