@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
+use App\Http\Resources\OrderLocationResource;
 use App\Models\Package;
 use App\Models\Order;
 use App\Models\Service;
@@ -15,6 +16,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
@@ -27,21 +29,26 @@ class OrderController extends Controller
         $this->middleware('auth:sanctum');
     }
 
+    // جوجل- إضافة GoogleRoutesService كـ dependency عبر method injection
     public function getAvailableSlots(Package $package, Request $request, GoogleRoutesService $routesService): JsonResponse
     {
         $service = $package->service;
         $company = $service->company;
-        $packageDuration = $package->duration; 
+        $packageDuration = $package->duration; // minutes
 
+        // جوجل- التحقق من إحداثيات الطلب المرغوب (تُرسل من الخريطة على الفرونت)
         $validated = $request->validate([
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
 
+        // جوجل- الشركة يجب أن تملك إحداثيات مسبقاً (عمود nullable للترحيل التدريجي)
+        // فشل صريح بدل احتساب خاطئ صامت
         if (is_null($company->latitude) || is_null($company->longitude)) {
             return $this->errorResponse('Company location is not configured yet', 422);
         }
 
+        // جوجل- حساب زمن التنقل مرة واحدة فقط، خارج كل الحلقات (أداء/تكلفة)
         $oneWayMinutes = $routesService->calculateDrivingRoute(
             $company->latitude,
             $company->longitude,
@@ -49,6 +56,7 @@ class OrderController extends Controller
             $validated['longitude']
         );
 
+        // جوجل- فشل صريح عند فشل الـ API بدل fallback صامت يؤثر على دقة الجدولة
         if (is_null($oneWayMinutes)) {
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
@@ -57,6 +65,7 @@ class OrderController extends Controller
             return $this->errorResponse('Far distance! Please try another company or change your location', 422);
         }
 
+        // جوجل- ذهاب + إياب، مقرّب للأعلى لأقرب نصف ساعة (وليس لأقرب نصف ساعة عادي)
         $travelBufferMinutes = (int) (ceil(($oneWayMinutes * 2) / 30) * 30);
 
         $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
@@ -139,6 +148,7 @@ class OrderController extends Controller
 
                     $conflict = false;
                     foreach ($combo as $worker) {
+                        // جوجل- استبدال منطق hasOverlap المكرر بالدالة الموحدة isWorkerAvailable
                         if (!$this->isWorkerAvailable($worker, $slotStart, $slotEffectiveEnd)) {
                             $conflict = true;
                             break;
@@ -354,6 +364,7 @@ class OrderController extends Controller
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
 
+            // Payment
             'payment_method' => 'required|in:electric,manual',
         ]);
 
@@ -412,6 +423,7 @@ class OrderController extends Controller
                 'status' => 'pending',
                 'total_price' => $totals['total_price'],
 
+                // Payment
                 'payment_method' => $validated['payment_method'],
                 'payment_status' => $validated['payment_method'] === 'electric'
                     ? 'pending'
@@ -540,6 +552,7 @@ class OrderController extends Controller
                 }
             }
         } catch (\Exception $e) {
+            // proceed quietly; order stays pending if assignment fails
         }
 
         return $this->successResponse(
@@ -563,6 +576,7 @@ class OrderController extends Controller
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
 
+            // Payment
             'payment_method' => 'required|in:electric,manual',
         ]);
 
@@ -574,6 +588,7 @@ class OrderController extends Controller
             return $this->errorResponse('Company location is not configured yet', 422);
         }
 
+        // جوجل - حساب زمن التنقل ذهاباً فقط عبر الخدمة
         $oneWayMinutes = $routesService->calculateDrivingRoute(
             $company->latitude,
             $company->longitude,
@@ -581,6 +596,7 @@ class OrderController extends Controller
             $validated['longitude']
         );
 
+        // جوجل - فشل صريح بدل الابتلاع الصامت
         if (is_null($oneWayMinutes)) {
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
@@ -649,6 +665,7 @@ class OrderController extends Controller
 
                 'total_price' => $attributeTotals['total_price'],
 
+                // Payment
                 'payment_method' => $validated['payment_method'],
 
                 'payment_status' => $validated['payment_method'] === 'electric'
@@ -660,7 +677,11 @@ class OrderController extends Controller
                 'is_company_paid' => $validated['payment_method'] === 'manual',
             ]);
 
-          
+            /*
+        |--------------------------------------------------------------------------
+        | Calculate internal payment shares
+        |--------------------------------------------------------------------------
+        */
 
             $order->calculateAndSetPaymentShares();
 
@@ -673,6 +694,7 @@ class OrderController extends Controller
 
         $order->load(['package.service', 'attributes']);
 
+        // Automatic assignment
         try {
             $service = $package->service;
             $company = $service->company;
@@ -817,6 +839,7 @@ class OrderController extends Controller
                 }
             }
         } catch (\Exception $e) {
+            // proceed quietly; order stays pending if assignment fails
         }
 
         return $this->successResponse(
@@ -838,14 +861,17 @@ class OrderController extends Controller
         return $this->errorResponse('This order cannot be canceled', 422);
     }
 
+    // معالجة إلغاء الدفع أو الاسترجاع في Stripe للطلبات الإلكترونية
     if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
         try {
             $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
 
+            // 1. إذا كان المبلغ محجوزاً فقط، نلغي الحجز
             if ($order->payment_status === 'held') {
                 $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
                 $order->update(['payment_status' => 'refunded']);
             }
+            // 2. إذا كان المبلغ قد اقتُطع بالفعل، نردّه للعميل
             elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
                 $stripe->refunds->create([
                     'payment_intent' => $order->stripe_payment_intent_id,
@@ -876,15 +902,16 @@ class OrderController extends Controller
         ]);
 
         $user = auth()->user();
-        $perPage = $request->get('per_page', 10);
+        $validated = $request->validate([
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+        $perPage = $validated['per_page'] ?? 10;
 
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
-        if ($user->isAdmin()) {
-        } elseif ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company)
-                return $this->successResponse([
+        if (! $this->applyOrderVisibilityScope($query, $user)) {
+            return $this->successResponse([
                     'data' => [],
                     'pagination' => [
                         'current_page' => 1,
@@ -896,16 +923,6 @@ class OrderController extends Controller
                         'has_more_pages' => false,
                     ]
                 ], 'No company registered');
-
-            $query->whereHas('package.service', function ($q) use ($company) {
-                $q->where('company_id', $company->id);
-            });
-        } elseif ($user->role === 'region_manager') {
-            $query->whereHas('package.service.company', function ($q) use ($user) {
-                $q->whereIn('region_id', $user->managedRegions()->pluck('id'));
-            });
-        } else {
-            $query->where('client_id', $user->id);
         }
 
         if (!empty($validated['status'])) {
@@ -935,6 +952,46 @@ class OrderController extends Controller
         return $this->successResponse($responseData, 'Orders index fetched successfully');
     }
 
+    /**
+     * Return all visible orders that have usable coordinates for map markers.
+     */
+    public function locations(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Order::class);
+
+        $query = Order::query()
+            ->select([
+                'id',
+                'client_id',
+                'package_id',
+                'latitude',
+                'longitude',
+                'status',
+                'location',
+                'start_time',
+                'end_time',
+                'total_price',
+            ])
+            ->with([
+                'client:id,fullname',
+                'package:id,service_id,name_ar,name_en',
+                'package.service:id,name_ar,name_en',
+            ])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude');
+
+        if (! $this->applyOrderVisibilityScope($query, auth()->user())) {
+            return $this->successResponse([], 'No company registered');
+        }
+
+        $orders = $query->orderByDesc('created_at')->get();
+
+        return $this->successResponse(
+            OrderLocationResource::collection($orders),
+            'Order locations fetched successfully'
+        );
+    }
+
     public function show(Order $order): JsonResponse
     {
         $this->authorize('view', $order);
@@ -942,6 +999,42 @@ class OrderController extends Controller
         $order->load(['client.profile', 'package.service.company.region', 'attributes', 'tasks.workgroup.workers.profile', 'tasks.workgroup.leader.profile']);
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
+    }
+
+    /**
+     * Apply the same role and company boundaries used by the Orders index.
+     */
+    private function applyOrderVisibilityScope(Builder $query, User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($user->isCompanyManager()) {
+            $company = $user->managedCompanies()->first();
+
+            if (! $company) {
+                return false;
+            }
+
+            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+                $serviceQuery->where('company_id', $company->id);
+            });
+
+            return true;
+        }
+
+        if ($user->role === 'region_manager') {
+            $query->whereHas('package.service.company', function (Builder $companyQuery) use ($user) {
+                $companyQuery->whereIn('region_id', $user->managedRegions()->pluck('id'));
+            });
+
+            return true;
+        }
+
+        $query->where('client_id', $user->id);
+
+        return true;
     }
 
 
@@ -961,6 +1054,7 @@ class OrderController extends Controller
             }
             $results[] = $combo;
 
+            // move to next
             $i = $k - 1;
             while ($i >= 0 && $indices[$i] == $i + $n - $k) {
                 $i--;
@@ -1033,13 +1127,18 @@ class OrderController extends Controller
         return (int) ceil($minutes / $step) * $step;
     }
 
+    // جوجل- دالة موحّدة تحل محل تكرار hasOverlap في store() و getAvailableSlots()
+    // تستخدم effective end time (end_time + travel_buffer_minutes) بدل end_time فقط،
+    // لكلا الطرفين: الطلب الموجود مسبقاً في القاعدة، والطلب/الـ slot الجديد المطلوب فحصه.
     private function isWorkerAvailable(User $worker, Carbon $newStart, Carbon $newEffectiveEnd): bool
     {
         $conflict = Order::where('status', '!=', 'canceled')
             ->whereHas('tasks.workgroup.workers', function ($q) use ($worker) {
                 $q->where('users.id', $worker->id);
             })
+            // جوجل- الطلب الموجود يبدأ قبل نهاية الطلب الجديد الفعلية
             ->where('start_time', '<', $newEffectiveEnd)
+            // جوجل- نهاية الطلب الموجود الفعلية (end_time + travel_buffer_minutes) تقع بعد بداية الطلب الجديد
             ->whereRaw('DATE_ADD(end_time, INTERVAL travel_buffer_minutes MINUTE) > ?', [$newStart])
             ->exists();
 

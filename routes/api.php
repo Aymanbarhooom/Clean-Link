@@ -145,6 +145,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::apiResource('services', ServiceController::class);
+    Route::get('services/{service}/skills', [ServiceController::class, 'skills']);
     Route::put('/services/{service}/attributes', [ServiceController::class, 'updateAttributes']);
 
     Route::apiResource('packages', PackageController::class);
@@ -194,6 +195,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // 🛒 مسارات الطلبات المتطورة (Orders Matrix)
     // ==========================================
+    Route::get('orders/locations', [OrderController::class, 'locations']);
     Route::get('orders', [OrderController::class, 'index']);
     Route::get('orders/{order}', [OrderController::class, 'show']);
 

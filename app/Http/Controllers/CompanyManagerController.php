@@ -50,7 +50,11 @@ class CompanyManagerController extends Controller
 
    public function getWorkers(Request $request, Company $company): JsonResponse
 {
-    $perPage = $request->get('per_page', 6);
+    $validated = $request->validate([
+        'page' => 'sometimes|integer|min:1',
+        'per_page' => 'sometimes|integer|min:1|max:100',
+    ]);
+    $perPage = $validated['per_page'] ?? 6;
     
     $workers = User::with(['profile', 'workerProfile'])
         ->whereHas('workerProfile', function ($query) use ($company) {
@@ -85,9 +89,12 @@ class CompanyManagerController extends Controller
 
         $validated = $request->validate([
             'query' => 'required|string|min:1',
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
         ]);
 
         $query = trim($validated['query']);
+        $perPage = $validated['per_page'] ?? 10;
 
         $workersQuery = User::with(['profile', 'workerProfile'])
             ->whereHas('workerProfile', function ($workerProfileQuery) use ($user) {
@@ -99,9 +106,25 @@ class CompanyManagerController extends Controller
             ->where(function ($searchQuery) use ($query) {
                 $searchQuery->where('fullname', 'like', "%{$query}%")
                     ->orWhere('email', 'like', "%{$query}%");
-            });
+            })
+            ->orderBy('id', 'asc');
 
-        return $this->successResponse($workersQuery->get(), 'Workers search results fetched');
+        $workers = $workersQuery->paginate($perPage);
+
+        $responseData = [
+            'data' => $workers->items(),
+            'pagination' => [
+                'current_page' => $workers->currentPage(),
+                'per_page' => $workers->perPage(),
+                'total' => $workers->total(),
+                'last_page' => $workers->lastPage(),
+                'from' => $workers->firstItem(),
+                'to' => $workers->lastItem(),
+                'has_more_pages' => $workers->hasMorePages(),
+            ],
+        ];
+
+        return $this->successResponse($responseData, 'Workers search results fetched');
     }
 
     public function updateWorker(Request $request, User $worker): JsonResponse
@@ -126,6 +149,7 @@ class CompanyManagerController extends Controller
 
     public function deleteWorker(User $worker): JsonResponse
     {
+        // Enforces Admin or company boundary controls before removing user identities from tables
         if (!auth()->user()->isAdmin() && auth()->user()->id !== $worker->workerProfile?->company?->manager_id) {
             return $this->errorResponse('Access execution context restricted', 403);
         }
