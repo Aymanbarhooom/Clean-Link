@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Order;
 use App\Models\Region;
 use App\Models\Service;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Stripe\StripeClient;
@@ -164,25 +165,500 @@ class PaymentController extends Controller
         }
     }
 
-    public function index(Request $request): JsonResponse
+    // ==========================================
+    // SECTION 1: CLIENT APIs
+    // ==========================================
+
+    /**
+     * Client: GET/POST /api/client/payments
+     */
+    public function clientPayments(Request $request): JsonResponse
     {
         $user = auth()->user();
+        
+        $query = Order::with(['package.service.company'])
+            ->where('client_id', $user->id);
 
-        // بداية الاستعلام بناءً على التسلسل: Region -> Company -> Service -> Package -> Order
-        $query = Order::with(['client', 'package.service.company.region', 'latestPayment']);
-
-        // 1. تحديد النطاق حسب الصلاحيات
-        if ($user->role === 'client') {
-            $query->where('client_id', $user->id);
-        } elseif ($user->role === 'companyManager') {
-            $companyIds = Company::where('manager_id', $user->id)->pluck('id');
-            $query->whereHas('package.service.company', function ($q) use ($companyIds) {
-                $q->whereIn('id', $companyIds);
-            });
+        if ($request->filled('status')) {
+            $query->where('payment_status', $request->status);
         }
-        // إذا كان admin يجلب الكل مباشرة
 
-        // 2. تطبيق الفلاتر الاختيارية
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        $perPage = $request->get('per_page', 10);
+        $orders = $query->latest()->paginate($perPage);
+
+        return $this->successResponse($orders, 'Client payments retrieved successfully', 200);
+    }
+
+    /**
+     * Client: GET /api/client/payments/{payment}
+     */
+    public function clientShowPayment($id): JsonResponse
+    {
+        $user = auth()->user();
+        $order = Order::with(['package.service.company'])
+            ->where('client_id', $user->id)
+            ->find($id);
+
+        if (!$order) {
+            return $this->errorResponse('Payment not found', 404);
+        }
+
+        return $this->successResponse([
+            'id' => $order->id,
+            'order' => [
+                'id' => $order->id,
+                'status' => $order->status
+            ],
+            'company' => [
+                'id' => $order->package->service->company->id ?? null,
+                'name' => $order->package->service->company->name ?? '',
+            ],
+            'service' => [
+                'id' => $order->package->service->id ?? null,
+                'name' => $order->package->service->name ?? '',
+            ],
+            'package' => [
+                'id' => $order->package->id ?? null,
+                'name' => $order->package->name ?? '',
+            ],
+            'total_price' => (float) $order->total_price,
+            'currency' => 'USD',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_status' => $order->payment_status,
+            'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
+            'paid_at' => $order->updated_at->toIso8601String(),
+            'created_at' => $order->created_at->toIso8601String(),
+        ], 'Payment retrieved successfully', 200);
+    }
+
+    // ==========================================
+    // SECTION 2: COMPANY MANAGER APIs
+    // ==========================================
+
+    /**
+     * 1. GET /api/companies/{company}/dashboard
+     */
+    public function companyDashboard(Company $company): JsonResponse
+    {
+        $services = Service::where('company_id', $company->id);
+        $serviceIds = $services->pluck('id');
+
+        $orders = Order::whereHas('package', fn($q) => $q->whereIn('service_id', $serviceIds));
+        $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'company' => [
+                    'id' => $company->id,
+                    'name' => $company->name,
+                ],
+                'workers' => [
+                    'total' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id))->count(),
+                    'available' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'available'))->count(),
+                    'busy' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'busy'))->count(),
+                    'inactive' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'inactive'))->count(),
+                ],
+                'services' => [
+                    'total' => $services->count(),
+                    'active' => (clone $services)->where('is_active', true)->count(),
+                    'inactive' => (clone $services)->where('is_active', false)->count(),
+                ],
+                'orders' => [
+                    'total' => $orders->count(),
+                    'pending' => (clone $orders)->where('status', 'pending')->count(),
+                    'assigned_to_worker' => (clone $orders)->where('status', 'assigned_to_worker')->count(),
+                    'in_route' => (clone $orders)->where('status', 'in_route')->count(),
+                    'in_process' => (clone $orders)->where('status', 'in_process')->count(),
+                    'completed' => (clone $orders)->where('status', 'completed')->count(),
+                    'canceled' => (clone $orders)->where('status', 'canceled')->count(),
+                ],
+                'payments' => [
+                    'gross_revenue' => (float) $paidOrders->sum('total_price'),
+                    'company_profit' => (float) $paidOrders->sum('company_share'),
+                    'system_profit' => (float) $paidOrders->sum('admin_share'),
+                    'paid_payments_count' => $paidOrders->count(),
+                ],
+                'recent_orders' => (clone $orders)->latest()->take(5)->get(),
+                'recent_payments' => (clone $paidOrders)->latest()->take(5)->get(),
+            ]
+        ], 200);
+    }
+
+    /**
+     * 2. POST /api/companies/{company}/payments/summary OR /company-manager/payments/analytics
+     */
+    public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
+    {
+        $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
+            ->whereIn('payment_status', ['paid', 'held']);
+
+        if ($request->filled('service_id')) {
+            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+        }
+
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $grossRevenue = (float) $query->sum('total_price');
+        $totalPayments = $query->count();
+
+        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $electricQuery = (clone $query)->where('payment_method', 'electric');
+
+        return $this->successResponse([
+            'gross_revenue' => $grossRevenue,
+            'total_payments' => $totalPayments,
+            'average_payment' => $totalPayments > 0 ? round($grossRevenue / $totalPayments, 2) : 0,
+            'cash' => [
+                'total_amount' => (float) $cashQuery->sum('total_price'),
+                'payments_count' => $cashQuery->count(),
+            ],
+            'electric' => [
+                'total_amount' => (float) $electricQuery->sum('total_price'),
+                'payments_count' => $electricQuery->count(),
+            ],
+            'system_profit' => (float) $query->sum('admin_share'),
+            'company_profit' => (float) $query->sum('company_share'),
+        ], 'Company payments summary retrieved successfully', 200);
+    }
+
+    /**
+     * 3. POST /api/companies/{company}/payments/search
+     */
+    public function companyPaymentsSearch(Request $request, Company $company): JsonResponse
+    {
+        $query = Order::with(['client', 'package.service'])
+            ->whereHas('package.service', fn($q) => $q->where('company_id', $company->id));
+
+        if ($request->filled('status')) {
+            $query->where('payment_status', $request->status);
+        }
+
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('service_id')) {
+            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $perPage = $request->get('per_page', 10);
+        $orders = $query->latest()->paginate($perPage);
+
+        return $this->successResponse($orders, 'Company payments search retrieved successfully', 200);
+    }
+
+    /**
+     * 4. GET /api/companies/{company}/payments/{payment}
+     */
+    public function companyShowPayment(Company $company, $paymentId): JsonResponse
+    {
+        $order = Order::with(['client', 'package.service'])
+            ->whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
+            ->find($paymentId);
+
+        if (!$order) {
+            return $this->errorResponse('Payment not found for this company', 404);
+        }
+
+        return $this->successResponse([
+            'id' => $order->id,
+            'order' => [
+                'id' => $order->id,
+                'status' => $order->status,
+            ],
+            'client' => [
+                'id' => $order->client_id,
+                'name' => $order->client->name ?? '',
+                'email' => $order->client->email ?? '',
+            ],
+            'service' => [
+                'id' => $order->package->service->id ?? null,
+                'name' => $order->package->service->name ?? '',
+            ],
+            'package' => [
+                'id' => $order->package->id ?? null,
+                'name' => $order->package->name ?? '',
+            ],
+            'total_price' => (float) $order->total_price,
+            'currency' => 'USD',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_status' => $order->payment_status,
+            'system_share' => (float) $order->admin_share,
+            'company_share' => (float) $order->company_share,
+            'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
+        ], 'Company payment retrieved successfully', 200);
+    }
+
+    /**
+     * 5. POST /api/companies/{company}/payments/services-statistics
+     */
+    public function companyServicesStats(Request $request, Company $company): JsonResponse
+    {
+        $services = Service::where('company_id', $company->id)->get()->map(function ($service) use ($request) {
+            $orders = Order::whereHas('package', fn($q) => $q->where('service_id', $service->id));
+
+            if ($request->filled('payment_method')) {
+                $orders->where('payment_method', $request->payment_method);
+            }
+
+            if ($request->filled('from_date')) {
+                $orders->whereDate('created_at', '>=', $request->from_date);
+            }
+
+            if ($request->filled('to_date')) {
+                $orders->whereDate('created_at', '<=', $request->to_date);
+            }
+
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+
+            return [
+                'service_id' => $service->id,
+                'service_name' => $service->name,
+                'orders_count' => $orders->count(),
+                'payments_count' => $paidOrders->count(),
+                'gross_revenue' => (float) $paidOrders->sum('total_price'),
+                'system_profit' => (float) $paidOrders->sum('admin_share'),
+                'company_profit' => (float) $paidOrders->sum('company_share'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+            ];
+        });
+
+        return $this->successResponse($services, 'Company services statistics retrieved successfully', 200);
+    }
+
+    /**
+     * 6. POST /api/companies/{company}/payments/revenue-chart
+     */
+    public function companyRevenueChart(Request $request, Company $company): JsonResponse
+    {
+        $groupByParam = $request->get('group_by', $request->get('period', 'month'));
+        $year = $request->get('year', date('Y'));
+
+        $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
+            ->whereIn('payment_status', ['paid', 'held']);
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        } else {
+            $query->whereYear('created_at', $year);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        if (in_array($groupByParam, ['day', 'daily'])) {
+            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d') as period");
+        } elseif (in_array($groupByParam, ['week', 'weekly'])) {
+            $groupBy = DB::raw("CONCAT(YEAR(created_at), '-W', WEEK(created_at)) as period");
+        } elseif (in_array($groupByParam, ['year', 'yearly'])) {
+            $groupBy = DB::raw("YEAR(created_at) as period");
+        } else {
+            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period");
+        }
+
+        $chartData = $query->select(
+            $groupBy,
+            DB::raw('SUM(total_price) as gross_revenue'),
+            DB::raw('SUM(admin_share) as system_profit'),
+            DB::raw('SUM(company_share) as company_profit')
+        )
+        ->groupBy('period')
+        ->orderBy('period', 'ASC')
+        ->get();
+
+        return $this->successResponse($chartData, 'Company revenue chart retrieved successfully', 200);
+    }
+
+    // ==========================================
+    // SECTION 3: ADMIN APIs
+    // ==========================================
+
+    /**
+     * 7. GET /api/admin/dashboard
+     */
+    public function adminDashboard(): JsonResponse
+    {
+        $paidOrders = Order::whereIn('payment_status', ['paid', 'held']);
+
+        return $this->successResponse([
+                'clients' => ['total' => User::where('role', 'client')->count()],
+                'workers' => ['total' => User::whereHas('workerProfile')->count()],
+                'companies' => [
+                    'total' => Company::count(),
+                    'active' => Company::where('is_active', true)->count(),
+                    'pending' => Company::where('is_active', false)->count(),
+                    'blocked' => 0,
+                ],
+                'services' => ['total' => Service::count()],
+                'orders' => [
+                    'total' => Order::count(),
+                    'pending' => Order::where('status', 'pending')->count(),
+                    'assigned_to_worker' => Order::where('status', 'assigned_to_worker')->count(),
+                    'in_route' => Order::where('status', 'in_route')->count(),
+                    'in_process' => Order::where('status', 'in_process')->count(),
+                    'completed' => Order::where('status', 'completed')->count(),
+                    'canceled' => Order::where('status', 'canceled')->count(),
+                ],
+                'payments' => [
+                    'gross_revenue' => (float) $paidOrders->sum('total_price'),
+                    'system_profit' => (float) $paidOrders->sum('admin_share'),
+                    'companies_profit' => (float) $paidOrders->sum('company_share'),
+                    'paid_payments_count' => $paidOrders->count(),
+                ],
+                'recent_orders' => Order::latest()->take(5)->get(),
+                'recent_payments' => $paidOrders->latest()->take(5)->get(),
+            ], 'Admin dashboard retrieved successfully', 200);
+    }
+
+    /**
+     * 8. POST /api/admin/payments/analytics (or summary)
+     */
+    public function adminPaymentsAnalytics(Request $request): JsonResponse
+    {
+        $query = Order::whereIn('payment_status', ['paid', 'held']);
+
+        if ($request->filled('company_id')) {
+            $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
+        }
+
+        if ($request->filled('region_id')) {
+            $query->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
+        }
+
+        if ($request->filled('service_id')) {
+            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+        }
+
+        if ($request->filled('payment_method')) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        $grossRevenue = (float) $query->sum('total_price');
+        $totalPayments = $query->count();
+
+        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $electricQuery = (clone $query)->where('payment_method', 'electric');
+
+        return $this->successResponse([
+            'gross_revenue' => $grossRevenue,
+            'total_payments' => $totalPayments,
+            'average_payment' => $totalPayments > 0 ? round($grossRevenue / $totalPayments, 2) : 0,
+            'cash' => [
+                'total_amount' => (float) $cashQuery->sum('total_price'),
+                'payments_count' => $cashQuery->count(),
+            ],
+            'electric' => [
+                'total_amount' => (float) $electricQuery->sum('total_price'),
+                'payments_count' => $electricQuery->count(),
+            ],
+            'system_profit' => (float) $query->sum('admin_share'),
+            'companies_profit' => (float) $query->sum('company_share'),
+        ], 'Admin payments analytics retrieved successfully', 200);
+    }
+
+    /**
+     * 9. POST /api/admin/payments/revenue-chart
+     */
+    public function adminRevenueChart(Request $request): JsonResponse
+    {
+        $groupByParam = $request->get('group_by', 'month');
+        $query = Order::whereIn('payment_status', ['paid', 'held']);
+
+        if ($request->filled('company_id')) {
+            $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
+        }
+
+        if ($request->filled('region_id')) {
+            $query->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
+        }
+
+        if ($request->filled('service_id')) {
+            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        if (in_array($groupByParam, ['day', 'daily'])) {
+            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d') as period");
+        } elseif (in_array($groupByParam, ['week', 'weekly'])) {
+            $groupBy = DB::raw("CONCAT(YEAR(created_at), '-W', WEEK(created_at)) as period");
+        } elseif (in_array($groupByParam, ['year', 'yearly'])) {
+            $groupBy = DB::raw("YEAR(created_at) as period");
+        } else {
+            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period");
+        }
+
+        $chartData = $query->select(
+            $groupBy,
+            DB::raw('SUM(total_price) as gross_revenue'),
+            DB::raw('SUM(admin_share) as system_profit'),
+            DB::raw('SUM(company_share) as companies_profit')
+        )
+        ->groupBy('period')
+        ->orderBy('period', 'ASC')
+        ->get();
+
+        return $this->successResponse($chartData, 'Admin revenue chart retrieved successfully', 200);
+    }
+
+    /**
+     * 10. POST /api/admin/payments/search
+     */
+    public function adminPaymentsSearch(Request $request): JsonResponse
+    {
+        $query = Order::with(['client', 'package.service.company.region']);
+
+        if ($request->filled('company_id')) {
+            $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
+        }
+
+        if ($request->filled('region_id')) {
+            $query->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
+        }
+
+        if ($request->filled('service_id')) {
+            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+        }
+
         if ($request->filled('status')) {
             $query->where('payment_status', $request->status);
         }
@@ -199,223 +675,145 @@ class PaymentController extends Controller
             $query->whereDate('created_at', '<=', $request->to_date);
         }
 
-        $orders = $query->latest()->paginate(15);
+        $perPage = $request->get('per_page', 10);
+        $orders = $query->latest()->paginate($perPage);
 
-        return $this->successResponse(
-            $orders,
-            'Orders retrieved successfully',
-            200
-        );
+        return $this->successResponse($orders, 'Admin payments search retrieved successfully', 200);
     }
 
     /**
-     * 2. GET /api/payments/{id}
-     * عرض تفاصيل دفعة/طلب محدد
+     * 11. Companies Statistics (Enhanced with Date Filters)
      */
-    public function show($id): JsonResponse
+    public function adminCompaniesStats(Request $request): JsonResponse
     {
-        $order = Order::with(['client', 'package.service.company.region', 'latestPayment'])->find($id);
-
-        if (!$order) {
-            return $this->errorResponse('Payment record not found', 404);
-        }
-
-        return $this->successResponse(
-            $order,
-            'Payment record retrieved successfully',
-            200
-        );
-    }
-
-    /**
-     * 3. إحصائيات مدير الشركة العامة + نسختي (service_id / region_id)
-     */
-    public function companyAnalytics(Request $request): JsonResponse
-    {
-        $query = Order::query()->whereIn('payment_status', ['paid', 'held']);
-
-        // فلترة حسب الشركة أو الخدمة أو المنطقة
-        if ($request->filled('company_id')) {
-            $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
-        }
-
-        if ($request->filled('service_id')) {
-            $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
-        }
-
-        if ($request->filled('region_id')) {
-            $query->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
-        }
-
-        if ($request->filled('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
-        }
-
-        if ($request->filled('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
-        }
-
-        $totalRevenue = (float) $query->sum('total_price');
-        $totalPayments = $query->count();
-
-        $cashQuery = (clone $query)->where('payment_method', 'cash');
-        $cashTotal = (float) $cashQuery->sum('total_price');
-        $cashCount = $cashQuery->count();
-
-        $stripeQuery = (clone $query)->where('payment_method', 'electric');
-        $stripeTotal = (float) $stripeQuery->sum('total_price');
-        $stripeCount = $stripeQuery->count();
-
-        $systemProfit = (float) $query->sum('admin_share');
-        $companyNetProfit = (float) $query->sum('company_share');
-
-        $averagePayment = $totalPayments > 0 ? round($totalRevenue / $totalPayments, 2) : 0;
-
-        return $this->successResponse(
-            [
-                'total_revenue' => $totalRevenue,
-                'total_payments' => $totalPayments,
-                'cash' => [
-                    'total_amount' => $cashTotal,
-                    'payments_count' => $cashCount,
-                ],
-                'stripe' => [
-                    'total_amount' => $stripeTotal,
-                    'payments_count' => $stripeCount,
-                ],
-                'system_profit' => $systemProfit,
-                'company_net_profit' => $companyNetProfit,
-                'average_payment' => $averagePayment,
-            ],
-            'Analytics retrieved successfully',
-            200
-        );
-    }
-
-    /**
-     * 4. GET /api/companies/{company}/payments/revenue-chart
-     * الرسم البياني المالي للشركة (daily, weekly, monthly, yearly)
-     */
-    public function companyRevenueChart(Request $request, Company $company): JsonResponse
-    {
-        $period = $request->get('period', 'monthly');
-        $year = $request->get('year', date('Y'));
-
-        $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
-            ->whereIn('payment_status', ['paid', 'held'])
-            ->whereYear('created_at', $year);
-
-        if ($period === 'daily') {
-            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m-%d') as period");
-        } elseif ($period === 'weekly') {
-            $groupBy = DB::raw("CONCAT(YEAR(created_at), '-W', WEEK(created_at)) as period");
-        } elseif ($period === 'yearly') {
-            $groupBy = DB::raw("YEAR(created_at) as period");
-        } else {
-            // monthly كخيار افتراضي
-            $groupBy = DB::raw("DATE_FORMAT(created_at, '%Y-%m') as period");
-        }
-
-        $chartData = $query->select(
-            $groupBy,
-            DB::raw('SUM(total_price) as revenue'),
-            DB::raw('SUM(admin_share) as system_profit'),
-            DB::raw('SUM(company_share) as company_profit')
-        )
-        ->groupBy('period')
-        ->orderBy('period', 'ASC')
-        ->get();
-
-        return $this->successResponse(
-            $chartData,
-            'Revenue chart data retrieved successfully',
-            200
-        );
-    }
-
-    /**
-     * Admin 1: GET /api/admin/payments/companies-statistics
-     */
-    public function adminCompaniesStats(): JsonResponse
-    {
-        $companies = Company::all()->map(function ($company) {
+        $companies = Company::all()->map(function ($company) use ($request) {
             $orders = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id));
+
+            if ($request->filled('region_id')) {
+                $orders->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
+            }
+
+            if ($request->filled('service_id')) {
+                $orders->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
+            }
+
+            if ($request->filled('payment_method')) {
+                $orders->where('payment_method', $request->payment_method);
+            }
+
+            if ($request->filled('from_date')) {
+                $orders->whereDate('created_at', '>=', $request->from_date);
+            }
+
+            if ($request->filled('to_date')) {
+                $orders->whereDate('created_at', '<=', $request->to_date);
+            }
+
             $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
 
             return [
                 'company_id' => $company->id,
-                'company_name' => $company->name ?? 'Company #' . $company->id,
+                'company_name' => $company->name,
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
                 'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-                'stripe_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'company_profit' => (float) $paidOrders->sum('company_share'),
             ];
         });
 
-        return $this->successResponse(
-            $companies,
-            'Companies statistics retrieved successfully',
-            200
-        );
+        return $this->successResponse($companies, 'Admin companies statistics retrieved successfully', 200);
     }
 
     /**
-     * Admin 2: GET /api/admin/payments/regions-statistics
+     * 12. Regions Statistics (Enhanced with Date Filters & Payment Counts)
      */
-    public function adminRegionsStats(): JsonResponse
+    public function adminRegionsStats(Request $request): JsonResponse
     {
-        $regions = Region::all()->map(function ($region) {
+        $regions = Region::all()->map(function ($region) use ($request) {
             $orders = Order::whereHas('package.service.company', fn($q) => $q->where('region_id', $region->id));
+
+            if ($request->filled('payment_method')) {
+                $orders->where('payment_method', $request->payment_method);
+            }
+
+            if ($request->filled('from_date')) {
+                $orders->whereDate('created_at', '>=', $request->from_date);
+            }
+
+            if ($request->filled('to_date')) {
+                $orders->whereDate('created_at', '<=', $request->to_date);
+            }
+
             $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
 
             return [
                 'region_id' => $region->id,
-                'region_name' => $region->name ?? 'Region #' . $region->id,
+                'region_name' => $region->name,
                 'companies_count' => Company::where('region_id', $region->id)->count(),
                 'orders_count' => $orders->count(),
+                'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];
         });
 
-        return $this->successResponse(
-            $regions,
-            'Regions statistics retrieved successfully',
-            200
-        );
+        return $this->successResponse($regions, 'Admin regions statistics retrieved successfully', 200);
     }
 
     /**
-     * Admin 3: GET /api/admin/payments/services-statistics
+     * 13. Services Statistics (Enhanced with Date Filters & Revenue breakdown)
      */
-    public function adminServicesStats(): JsonResponse
+    public function adminServicesStats(Request $request): JsonResponse
     {
-        $services = Service::all()->map(function ($service) {
+        $services = Service::all()->map(function ($service) use ($request) {
             $orders = Order::whereHas('package', fn($q) => $q->where('service_id', $service->id));
+
+            if ($request->filled('company_id')) {
+                $orders->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
+            }
+
+            if ($request->filled('region_id')) {
+                $orders->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
+            }
+
+            if ($request->filled('payment_method')) {
+                $orders->where('payment_method', $request->payment_method);
+            }
+
+            if ($request->filled('from_date')) {
+                $orders->whereDate('created_at', '>=', $request->from_date);
+            }
+
+            if ($request->filled('to_date')) {
+                $orders->whereDate('created_at', '<=', $request->to_date);
+            }
+
             $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
 
             return [
                 'service_id' => $service->id,
-                'service_name' => $service->name ?? 'Service #' . $service->id,
+                'service_name' => $service->name,
                 'orders_count' => $orders->count(),
+                'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
+                'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];
         });
 
-        return $this->successResponse(
-            $services,
-            'Services statistics retrieved successfully',
-            200
-        );
+        return $this->successResponse($services, 'Admin services statistics retrieved successfully', 200);
     }
 
     /**
-     * Admin 4: GET /api/admin/payments/{payment}
+     * 14. GET /api/admin/payments/{payment}
      */
     public function adminShowPayment($id): JsonResponse
     {
@@ -428,37 +826,32 @@ class PaymentController extends Controller
         $service = $order->package->service ?? null;
         $company = $service->company ?? null;
 
-        return $this->successResponse(
-            [
-                'id' => $order->id,
-                'order' => ['id' => $order->id],
-                'client' => [
-                    'id' => $order->client_id,
-                    'name' => $order->client->name ?? 'Client'
-                ],
-                'company' => [
-                    'id' => $company->id ?? null,
-                    'name' => $company->name ?? ''
-                ],
-                'region' => [
-                    'id' => $company->region->id ?? null,
-                    'name' => $company->region->name ?? ''
-                ],
-                'service' => [
-                    'id' => $service->id ?? null,
-                    'name' => $service->name ?? ''
-                ],
-                'amount' => (float) $order->total_price,
-                'payment_method' => $order->payment_method === 'electric' ? 'stripe' : 'cash',
-                'payment_status' => $order->payment_status,
-                'system_profit' => (float) $order->admin_share,
-                'company_profit' => (float) $order->company_share,
-                'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
-                'paid_at' => $order->updated_at->format('Y-m-d H:i:s'),
+        return $this->successResponse([
+            'id' => $order->id,
+            'order' => ['id' => $order->id],
+            'client' => [
+                'id' => $order->client_id,
+                'name' => $order->client->name ?? 'Client'
             ],
-            'Payment record retrieved successfully',
-            200
-        );
+            'company' => [
+                'id' => $company->id ?? null,
+                'name' => $company->name ?? ''
+            ],
+            'region' => [
+                'id' => $company->region->id ?? null,
+                'name' => $company->region->name ?? ''
+            ],
+            'service' => [
+                'id' => $service->id ?? null,
+                'name' => $service->name ?? ''
+            ],
+            'amount' => (float) $order->total_price,
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_status' => $order->payment_status,
+            'system_profit' => (float) $order->admin_share,
+            'company_profit' => (float) $order->company_share,
+            'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
+            'paid_at' => $order->updated_at->toIso8601String(),
+        ], 'Admin payment retrieved successfully', 200);
     }
-
 }
