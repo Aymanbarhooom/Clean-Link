@@ -238,24 +238,57 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('locations', LocationController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
-    Route::post(
-        '/payments/create-intent',
-        [PaymentController::class, 'createPaymentIntent']
-    );
+    // ==========================================
+    // 💳 PAYMENT MANAGEMENT ROUTES
+    // ==========================================
+    
+    // Stripe Payment Intent Creation (Client)
+    Route::post('/payments/create-intent', [PaymentController::class, 'createPaymentIntent']);
 
-    Route::get('payments', [PaymentController::class, 'index']);
-    Route::get('payments/{id}', [PaymentController::class, 'show']);
+    // ==========================================
+    // 👤 CLIENT PAYMENT ROUTES
+    // ==========================================
+    Route::prefix('client/payments')->group(function () {
+        Route::get('/', [PaymentController::class, 'clientPayments']);          // List client payments
+        Route::get('/{payment}', [PaymentController::class, 'clientShowPayment']); // Show payment details
+    });
 
-    // إحصائيات مدير الشركة والرسم البياني
-    Route::get('company-manager/payments/analytics', [PaymentController::class, 'companyAnalytics']);
-    Route::get('companies/{company}/payments/revenue-chart', [PaymentController::class, 'companyRevenueChart']);
+    // ==========================================
+    // 🏢 COMPANY MANAGER PAYMENT ROUTES
+    // ==========================================
+    Route::prefix('companies')->group(function () {
+        Route::prefix('{company}')->group(function () {
+            // Dashboard
+            Route::get('/dashboard', [PaymentController::class, 'companyDashboard']);
 
-    // إحصائيات الأدمن
-    Route::prefix('admin/payments')->group(function () {
-        Route::get('companies-statistics', [PaymentController::class, 'adminCompaniesStats']);
-        Route::get('regions-statistics', [PaymentController::class, 'adminRegionsStats']);
-        Route::get('services-statistics', [PaymentController::class, 'adminServicesStats']);
-        Route::get('{payment}', [PaymentController::class, 'adminShowPayment']);
+            // Payment Management
+            Route::prefix('payments')->group(function () {
+                Route::post('/summary', [PaymentController::class, 'companyPaymentsSummary']);        // Analytics summary with filters
+                Route::post('/search', [PaymentController::class, 'companyPaymentsSearch']);          // Search payments with pagination
+                Route::get('/{payment}', [PaymentController::class, 'companyShowPayment']);           // Show payment details
+                Route::post('/services-statistics', [PaymentController::class, 'companyServicesStats']); // Service-wise stats
+                Route::post('/revenue-chart', [PaymentController::class, 'companyRevenueChart']);      // Revenue chart data
+            });
+        });
+    });
+
+    // ==========================================
+    // 🔐 ADMIN PAYMENT ROUTES
+    // ==========================================
+    Route::prefix('admin')->group(function () {
+        // Admin Dashboard
+        Route::get('/dashboard', [PaymentController::class, 'adminDashboard']);
+
+        // Payment Analytics & Reports
+        Route::prefix('payments')->group(function () {
+            Route::post('/analytics', [PaymentController::class, 'adminPaymentsAnalytics']);          // Overall analytics with filters
+            Route::post('/search', [PaymentController::class, 'adminPaymentsSearch']);                // Search all payments
+            Route::post('/revenue-chart', [PaymentController::class, 'adminRevenueChart']);           // System-wide revenue chart
+            Route::post('/companies-statistics', [PaymentController::class, 'adminCompaniesStats']);  // Company stats
+            Route::post('/regions-statistics', [PaymentController::class, 'adminRegionsStats']);      // Region stats
+            Route::post('/services-statistics', [PaymentController::class, 'adminServicesStats']);    // Service stats
+            Route::get('/{payment}', [PaymentController::class, 'adminShowPayment']);                 // Show payment details
+        });
     });
 });
 
