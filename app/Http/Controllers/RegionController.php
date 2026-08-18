@@ -101,55 +101,59 @@ class RegionController extends Controller
     }
 
     public function getRegions(Request $request): JsonResponse
-{
-    $user = auth()->user();
-    $perPage = $request->get('per_page', 6);
+    {
+        $user = auth()->user();
+        $perPage = (int) $request->get('per_page', 6);
 
-    if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
-        return $this->errorResponse('Access mapping blocked', 403);
+        if (!($user->isAdmin() || $user->role === 'client' || $user->role === 'region_manager')) {
+            return $this->errorResponse('Access mapping blocked', 403);
+        }
+
+        $baseQuery = Region::with('manager')->orderBy('id', 'asc');
+
+        if ($user->isAdmin()) {
+            $regions = Cache::remember('all_regions_with_managers_all', now()->addDay(), function () use ($baseQuery) {
+                return $baseQuery->get();
+            });
+
+            return $this->successResponse([
+                'data' => $regions,
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => $regions->count(),
+                    'total' => $regions->count(),
+                    'last_page' => 1,
+                    'from' => $regions->count() > 0 ? 1 : 0,
+                    'to' => $regions->count(),
+                    'has_more_pages' => false,
+                ],
+            ], 'Regions context retrieved');
+        }
+
+        $regions = $baseQuery->get();
+
+        if ($user->role === 'region_manager') {
+            $regions = $regions->where('manager_id', $user->id)->values();
+        }
+
+        $currentPage = max(1, (int) $request->get('page', 1));
+        $paginated = $this->paginateCollection($regions, $perPage, $currentPage);
+
+        $responseData = [
+            'data' => RegionResource::collection($paginated->items()),
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'per_page' => $paginated->perPage(),
+                'total' => $paginated->total(),
+                'last_page' => $paginated->lastPage(),
+                'from' => $paginated->firstItem(),
+                'to' => $paginated->lastItem(),
+                'has_more_pages' => $paginated->hasMorePages(),
+            ],
+        ];
+
+        return $this->successResponse($responseData, 'Regions context retrieved');
     }
-
-    if ($user->isAdmin() || $user->role === 'client') {
-        $cacheKey = 'all_regions_with_managers_all';
-        
-        $allRegions = Cache::remember($cacheKey, now()->addDay(), function () {
-            return Region::with('manager')
-                ->orderBy('id', 'asc')
-                ->get();
-        });
-        
-        $currentPage = $request->get('page', 1);
-        $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
-        
-    } elseif ($user->role === 'region_manager') {
-        $cacheKey = 'regions_for_manager_' . $user->id . '_all';
-        
-        $allRegions = Cache::remember($cacheKey, now()->addDay(), function () use ($user) {
-            return Region::where('manager_id', $user->id)
-                ->with('manager')
-                ->orderBy('id', 'asc')
-                ->get();
-        });
-        
-        $currentPage = $request->get('page', 1);
-        $paginated = $this->paginateCollection($allRegions, $perPage, $currentPage);
-    }
-
-    $responseData = [
-        'data' => $paginated->items(),
-        'pagination' => [
-            'current_page' => $paginated->currentPage(),
-            'per_page' => $paginated->perPage(),
-            'total' => $paginated->total(),
-            'last_page' => $paginated->lastPage(),
-            'from' => $paginated->firstItem(),
-            'to' => $paginated->lastItem(),
-            'has_more_pages' => $paginated->hasMorePages(),
-        ]
-    ];
-
-    return $this->successResponse($responseData, 'Regions context retrieved');
-}
 
 
 protected function paginateCollection($collection, int $perPage, int $currentPage)
