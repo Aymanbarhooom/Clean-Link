@@ -723,11 +723,8 @@ class PaymentController extends Controller
 
         return [
             'company_id' => $company->id,
-            'company_name_ar' => $company->name_ar,
-            'company_name_en' => $company->name_en,
+            'company_name' => $company->name_en,
             'region_id' => $company->region_id,
-            'region_name_ar' => $company->region?->name_ar,
-            "region_name_en" => $company->region->name_en,
             'orders_count' => $ordersQuery->count(),
             'payments_count' => $paidOrders->count(),
             'gross_revenue' => (float) $paidOrders->sum('total_price'),
