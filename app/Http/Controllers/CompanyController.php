@@ -83,6 +83,8 @@ class CompanyController extends Controller
             'description_en' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
+            'longitude' => 'nullable|numeric',
+            'latitude' => 'nullable|numeric',
             'image' => 'nullable|image|max:2048'
         ]);
 
@@ -131,6 +133,8 @@ class CompanyController extends Controller
             'description_en' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
+            'longitude' => 'nullable|numeric',
+            'latitude' => 'nullable|numeric',
             'image' => 'nullable|image|max:2048'
         ]);
 
