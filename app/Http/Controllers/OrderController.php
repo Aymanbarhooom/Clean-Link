@@ -685,7 +685,7 @@ class OrderController extends Controller
 
                 'is_done_with_admin' => false,
 
-                'is_company_paid' => $validated['payment_method'] === 'manual',
+                'is_company_paid' => $validated['payment_method'] === 'manual', 
             ]);
 
             $order->payments()->create([
