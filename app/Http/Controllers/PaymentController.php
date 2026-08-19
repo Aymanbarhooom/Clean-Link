@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Region;
 use App\Models\Service;
 use App\Models\User;
@@ -176,8 +177,7 @@ class PaymentController extends Controller
     {
         $user = auth()->user();
         
-        $query = Order::with(['package.service.company'])
-            ->where('client_id', $user->id);
+        $query = Payment::where('user_id', $user->id);
 
         if ($request->filled('status')) {
             $query->where('payment_status', $request->status);
@@ -227,7 +227,7 @@ class PaymentController extends Controller
             ],
             'total_price' => (float) $order->total_price,
             'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
             'payment_status' => $order->payment_status,
             'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
             'paid_at' => $order->updated_at->toIso8601String(),
@@ -248,7 +248,7 @@ class PaymentController extends Controller
         $serviceIds = $services->pluck('id');
 
         $orders = Order::whereHas('package', fn($q) => $q->whereIn('service_id', $serviceIds));
-        $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+        $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
         return response()->json([
             'status' => 'success',
@@ -259,20 +259,15 @@ class PaymentController extends Controller
                 ],
                 'workers' => [
                     'total' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id))->count(),
-                    'available' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'available'))->count(),
-                    'busy' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'busy'))->count(),
-                    'inactive' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'inactive'))->count(),
                 ],
                 'services' => [
                     'total' => $services->count(),
-                    'active' => (clone $services)->where('is_active', true)->count(),
-                    'inactive' => (clone $services)->where('is_active', false)->count(),
                 ],
                 'orders' => [
                     'total' => $orders->count(),
                     'pending' => (clone $orders)->where('status', 'pending')->count(),
                     'assigned_to_worker' => (clone $orders)->where('status', 'assigned_to_worker')->count(),
-                    'in_route' => (clone $orders)->where('status', 'in_route')->count(),
+                    'on_way' => (clone $orders)->where('status', 'on_way')->count(),
                     'in_process' => (clone $orders)->where('status', 'in_process')->count(),
                     'completed' => (clone $orders)->where('status', 'completed')->count(),
                     'canceled' => (clone $orders)->where('status', 'canceled')->count(),
@@ -295,7 +290,7 @@ class PaymentController extends Controller
     public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
     {
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
-            ->whereIn('payment_status', ['paid', 'held']);
+            ->whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('service_id')) {
             $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
@@ -432,7 +427,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'service_id' => $service->id,
@@ -459,7 +454,7 @@ class PaymentController extends Controller
         $year = $request->get('year', date('Y'));
 
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
-            ->whereIn('payment_status', ['paid', 'held']);
+            ->whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('from_date')) {
             $query->whereDate('created_at', '>=', $request->from_date);
@@ -503,15 +498,13 @@ class PaymentController extends Controller
      */
     public function adminDashboard(): JsonResponse
     {
-        $paidOrders = Order::whereIn('payment_status', ['paid', 'held']);
+        $paidOrders = Order::whereIn('payment_status', ['captured', 'held']);
 
         return $this->successResponse([
                 'clients' => ['total' => User::where('role', 'client')->count()],
                 'workers' => ['total' => User::whereHas('workerProfile')->count()],
                 'companies' => [
                     'total' => Company::count(),
-                    'active' => Company::where('is_active', true)->count(),
-                    'pending' => Company::where('is_active', false)->count(),
                     'blocked' => 0,
                 ],
                 'services' => ['total' => Service::count()],
@@ -540,7 +533,7 @@ class PaymentController extends Controller
      */
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
-        $query = Order::whereIn('payment_status', ['paid', 'held']);
+        $query = Order::whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('company_id')) {
             $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
@@ -595,7 +588,7 @@ class PaymentController extends Controller
     public function adminRevenueChart(Request $request): JsonResponse
     {
         $groupByParam = $request->get('group_by', 'month');
-        $query = Order::whereIn('payment_status', ['paid', 'held']);
+        $query = Order::whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('company_id')) {
             $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
@@ -685,47 +678,62 @@ class PaymentController extends Controller
      * 11. Companies Statistics (Enhanced with Date Filters)
      */
     public function adminCompaniesStats(Request $request): JsonResponse
-    {
-        $companies = Company::all()->map(function ($company) use ($request) {
-            $orders = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id));
+{
+    // بناء استعلام الشركات مع الفلاتر
+    $companiesQuery = Company::query();
 
-            if ($request->filled('region_id')) {
-                $orders->whereHas('package.service.company', fn($q) => $q->where('region_id', $request->region_id));
-            }
+    // فلترة الشركات حسب المنطقة (وليس الطلبات)
+    if ($request->filled('region_id')) {
+        $companiesQuery->where('region_id', $request->region_id);
+    }
 
-            if ($request->filled('service_id')) {
-                $orders->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
-            }
+    // فلترة الشركات حسب الخدمة (من خلال العلاقات)
+    if ($request->filled('service_id')) {
+        $companiesQuery->whereHas('services', function($q) use ($request) {
+            $q->where('id', $request->service_id);
+        });
+    }
 
-            if ($request->filled('payment_method')) {
-                $orders->where('payment_method', $request->payment_method);
-            }
+    $companies = $companiesQuery->get();
 
-            if ($request->filled('from_date')) {
-                $orders->whereDate('created_at', '>=', $request->from_date);
-            }
-
-            if ($request->filled('to_date')) {
-                $orders->whereDate('created_at', '<=', $request->to_date);
-            }
-
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
-
-            return [
-                'company_id' => $company->id,
-                'company_name' => $company->name,
-                'orders_count' => $orders->count(),
-                'payments_count' => $paidOrders->count(),
-                'gross_revenue' => (float) $paidOrders->sum('total_price'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
-                'system_profit' => (float) $paidOrders->sum('admin_share'),
-                'company_profit' => (float) $paidOrders->sum('company_share'),
-            ];
+    $result = $companies->map(function ($company) use ($request) {
+        // بناء استعلام الطلبات لهذه الشركة
+        $ordersQuery = Order::whereHas('package.service', function($q) use ($company) {
+            $q->where('company_id', $company->id);
         });
 
-        return $this->successResponse($companies, 'Admin companies statistics retrieved successfully', 200);
-    }
+        // تطبيق فلاتر الطلبات (إذا وجدت)
+        if ($request->filled('payment_method')) {
+            $ordersQuery->where('payment_method', $request->payment_method);
+        }
+
+        if ($request->filled('from_date')) {
+            $ordersQuery->whereDate('created_at', '>=', $request->from_date);
+        }
+
+        if ($request->filled('to_date')) {
+            $ordersQuery->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        // الطلبات المدفوعة
+        $paidOrders = (clone $ordersQuery)->whereIn('payment_status', ['captured', 'held']);
+
+        return [
+            'company_id' => $company->id,
+            'company_name' => $company->name_en,
+            'region_id' => $company->region_id,
+            'orders_count' => $ordersQuery->count(),
+            'payments_count' => $paidOrders->count(),
+            'gross_revenue' => (float) $paidOrders->sum('total_price'),
+            'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+            'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+            'system_profit' => (float) $paidOrders->sum('admin_share'),
+            'company_profit' => (float) $paidOrders->sum('company_share'),
+        ];
+    });
+
+    return $this->successResponse($result, 'Admin companies statistics retrieved successfully', 200);
+}
 
     /**
      * 12. Regions Statistics (Enhanced with Date Filters & Payment Counts)
@@ -747,7 +755,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'region_id' => $region->id,
@@ -794,7 +802,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'service_id' => $service->id,
