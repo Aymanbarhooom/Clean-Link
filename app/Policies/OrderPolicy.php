@@ -20,6 +20,7 @@ class OrderPolicy
         }
 
         if ($user->isCompanyManager()) {
+            return true;
         }
 
     }

@@ -227,7 +227,7 @@ class PaymentController extends Controller
             ],
             'total_price' => (float) $order->total_price,
             'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
             'payment_status' => $order->payment_status,
             'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
             'paid_at' => $order->updated_at->toIso8601String(),
@@ -248,7 +248,7 @@ class PaymentController extends Controller
         $serviceIds = $services->pluck('id');
 
         $orders = Order::whereHas('package', fn($q) => $q->whereIn('service_id', $serviceIds));
-        $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+        $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
         return response()->json([
             'status' => 'success',
@@ -259,9 +259,6 @@ class PaymentController extends Controller
                 ],
                 'workers' => [
                     'total' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id))->count(),
-                    'available' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'available'))->count(),
-                    'busy' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'busy'))->count(),
-                    'inactive' => User::whereHas('workerProfile', fn($q) => $q->where('company_id', $company->id)->where('status', 'inactive'))->count(),
                 ],
                 'services' => [
                     'total' => $services->count(),
@@ -270,7 +267,7 @@ class PaymentController extends Controller
                     'total' => $orders->count(),
                     'pending' => (clone $orders)->where('status', 'pending')->count(),
                     'assigned_to_worker' => (clone $orders)->where('status', 'assigned_to_worker')->count(),
-                    'in_route' => (clone $orders)->where('status', 'in_route')->count(),
+                    'on_way' => (clone $orders)->where('status', 'on_way')->count(),
                     'in_process' => (clone $orders)->where('status', 'in_process')->count(),
                     'completed' => (clone $orders)->where('status', 'completed')->count(),
                     'canceled' => (clone $orders)->where('status', 'canceled')->count(),
@@ -293,7 +290,7 @@ class PaymentController extends Controller
     public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
     {
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
-            ->whereIn('payment_status', ['paid', 'held']);
+            ->whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('service_id')) {
             $query->whereHas('package', fn($q) => $q->where('service_id', $request->service_id));
@@ -430,7 +427,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'service_id' => $service->id,
@@ -457,7 +454,7 @@ class PaymentController extends Controller
         $year = $request->get('year', date('Y'));
 
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
-            ->whereIn('payment_status', ['paid', 'held']);
+            ->whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('from_date')) {
             $query->whereDate('created_at', '>=', $request->from_date);
@@ -501,7 +498,7 @@ class PaymentController extends Controller
      */
     public function adminDashboard(): JsonResponse
     {
-        $paidOrders = Order::whereIn('payment_status', ['paid', 'held']);
+        $paidOrders = Order::whereIn('payment_status', ['captured', 'held']);
 
         return $this->successResponse([
                 'clients' => ['total' => User::where('role', 'client')->count()],
@@ -536,7 +533,7 @@ class PaymentController extends Controller
      */
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
-        $query = Order::whereIn('payment_status', ['paid', 'held']);
+        $query = Order::whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('company_id')) {
             $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
@@ -591,7 +588,7 @@ class PaymentController extends Controller
     public function adminRevenueChart(Request $request): JsonResponse
     {
         $groupByParam = $request->get('group_by', 'month');
-        $query = Order::whereIn('payment_status', ['paid', 'held']);
+        $query = Order::whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('company_id')) {
             $query->whereHas('package.service', fn($q) => $q->where('company_id', $request->company_id));
@@ -719,7 +716,7 @@ class PaymentController extends Controller
         }
 
         // الطلبات المدفوعة
-        $paidOrders = (clone $ordersQuery)->whereIn('payment_status', ['paid', 'held']);
+        $paidOrders = (clone $ordersQuery)->whereIn('payment_status', ['captured', 'held']);
 
         return [
             'company_id' => $company->id,
@@ -758,7 +755,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'region_id' => $region->id,
@@ -805,7 +802,7 @@ class PaymentController extends Controller
                 $orders->whereDate('created_at', '<=', $request->to_date);
             }
 
-            $paidOrders = (clone $orders)->whereIn('payment_status', ['paid', 'held']);
+            $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
             return [
                 'service_id' => $service->id,
