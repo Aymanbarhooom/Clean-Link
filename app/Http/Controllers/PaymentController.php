@@ -250,9 +250,7 @@ class PaymentController extends Controller
         $orders = Order::whereHas('package', fn($q) => $q->whereIn('service_id', $serviceIds));
         $paidOrders = (clone $orders)->whereIn('payment_status', ['captured', 'held']);
 
-        return response()->json([
-            'status' => 'success',
-            'data' => [
+        return $this->successResponse([
                 'company' => [
                     'id' => $company->id,
                     'name' => $company->name,
@@ -280,8 +278,7 @@ class PaymentController extends Controller
                 ],
                 'recent_orders' => (clone $orders)->latest()->take(5)->get(),
                 'recent_payments' => (clone $paidOrders)->latest()->take(5)->get(),
-            ]
-        ], 200);
+            ], 'Company dashboard retrieved successfully', 200);
     }
 
     /**
