@@ -30,7 +30,6 @@ class StripeWebhookController extends Controller
         $object = $event->data->object;
         $orderId = $object->metadata->order_id ?? null;
 
-        // البحث عن الطلب إما عبر metadata أو عبر stripe_payment_intent_id
         $order = null;
         if ($orderId) {
             $order = Order::find($orderId);
@@ -40,7 +39,6 @@ class StripeWebhookController extends Controller
 
         if ($order) {
             switch ($event->type) {
-                // 1. عند حجز المبلغ نجاح من الـ Payment Sheet
                 case 'payment_intent.amount_capturable_updated':
                 case 'charge.succeeded':
                     if ($order->payment_method === 'electric' && $object->status === 'requires_capture') {
@@ -52,7 +50,6 @@ class StripeWebhookController extends Controller
                     }
                     break;
 
-                // 2. عند اقتطاع المبلغ فعلياً (Captured)
                 case 'payment_intent.succeeded':
                 case 'charge.captured':
                     if ($order->payment_method === 'electric') {
@@ -64,7 +61,6 @@ class StripeWebhookController extends Controller
                     }
                     break;
 
-                // 3. عند إلغاء الدفع
                 case 'payment_intent.canceled':
                     $order->update(['payment_status' => 'refunded']);
                     Log::info("Order #{$order->id} payment intent canceled.");

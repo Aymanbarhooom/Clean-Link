@@ -25,11 +25,6 @@ class PaymentController extends Controller
 
         $order = Order::find($validated['order_id']);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Authorization
-        |--------------------------------------------------------------------------
-        */
 
         if ($order->client_id !== auth()->id()) {
             return $this->errorResponse(
@@ -38,11 +33,7 @@ class PaymentController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Payment Method
-        |--------------------------------------------------------------------------
-        */
+   
 
         if ($order->payment_method !== 'electric') {
             return $this->errorResponse(
@@ -51,11 +42,7 @@ class PaymentController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Payment Status
-        |--------------------------------------------------------------------------
-        */
+    
 
         if ($order->payment_status !== 'pending') {
             return $this->errorResponse(
@@ -64,11 +51,6 @@ class PaymentController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Validate Order Status
-        |--------------------------------------------------------------------------
-        */
 
         if (in_array($order->status, ['canceled', 'completed', 'in_process'])) {
             return $this->errorResponse(
@@ -77,22 +59,14 @@ class PaymentController extends Controller
             );
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Stripe
-        |--------------------------------------------------------------------------
-        */
+        
 
         try {
             $stripe = new StripeClient(
                 config('services.stripe.secret')
             );
 
-            /*
-            |--------------------------------------------------------------------------
-            | Convert price to smallest currency unit
-            |--------------------------------------------------------------------------
-            */
+            
 
             $amount = (int) round($order->total_price * 100);
 
@@ -103,12 +77,7 @@ class PaymentController extends Controller
                 );
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Create PaymentIntent
-            |--------------------------------------------------------------------------
-            */
-
+           
             $paymentIntent = $stripe->paymentIntents->create([
                 'amount' => $amount,
                 'currency' => 'usd',
@@ -122,21 +91,13 @@ class PaymentController extends Controller
                 ],
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Save Stripe PaymentIntent ID
-            |--------------------------------------------------------------------------
-            */
+           
 
             $order->update([
                 'stripe_payment_intent_id' => $paymentIntent->id,
             ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Response
-            |--------------------------------------------------------------------------
-            */
+            
 
             return $this->successResponse(
                 [
@@ -170,9 +131,7 @@ class PaymentController extends Controller
     // SECTION 1: CLIENT APIs
     // ==========================================
 
-    /**
-     * Client: GET/POST /api/client/payments
-     */
+    
     public function clientPayments(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -193,9 +152,7 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Client payments retrieved successfully', 200);
     }
 
-    /**
-     * Client: GET /api/client/payments/{payment}
-     */
+    
     public function clientShowPayment($id): JsonResponse
     {
         $user = auth()->user();
@@ -239,9 +196,6 @@ class PaymentController extends Controller
     // SECTION 2: COMPANY MANAGER APIs
     // ==========================================
 
-    /**
-     * 1. GET /api/companies/{company}/dashboard
-     */
     public function companyDashboard(Company $company): JsonResponse
     {
         $services = Service::where('company_id', $company->id);
@@ -281,9 +235,7 @@ class PaymentController extends Controller
             ], 'Company dashboard retrieved successfully', 200);
     }
 
-    /**
-     * 2. POST /api/companies/{company}/payments/summary OR /company-manager/payments/analytics
-     */
+    
     public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
     {
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
@@ -328,9 +280,7 @@ class PaymentController extends Controller
         ], 'Company payments summary retrieved successfully', 200);
     }
 
-    /**
-     * 3. POST /api/companies/{company}/payments/search
-     */
+    
     public function companyPaymentsSearch(Request $request, Company $company): JsonResponse
     {
         $query = Order::with(['client', 'package.service'])
@@ -362,9 +312,7 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Company payments search retrieved successfully', 200);
     }
 
-    /**
-     * 4. GET /api/companies/{company}/payments/{payment}
-     */
+   
     public function companyShowPayment(Company $company, $paymentId): JsonResponse
     {
         $order = Order::with(['client', 'package.service'])
@@ -404,9 +352,6 @@ class PaymentController extends Controller
         ], 'Company payment retrieved successfully', 200);
     }
 
-    /**
-     * 5. POST /api/companies/{company}/payments/services-statistics
-     */
     public function companyServicesStats(Request $request, Company $company): JsonResponse
     {
         $services = Service::where('company_id', $company->id)->get()->map(function ($service) use ($request) {
@@ -442,9 +387,7 @@ class PaymentController extends Controller
         return $this->successResponse($services, 'Company services statistics retrieved successfully', 200);
     }
 
-    /**
-     * 6. POST /api/companies/{company}/payments/revenue-chart
-     */
+    
     public function companyRevenueChart(Request $request, Company $company): JsonResponse
     {
         $groupByParam = $request->get('group_by', $request->get('period', 'month'));
@@ -490,9 +433,7 @@ class PaymentController extends Controller
     // SECTION 3: ADMIN APIs
     // ==========================================
 
-    /**
-     * 7. GET /api/admin/dashboard
-     */
+    
     public function adminDashboard(): JsonResponse
     {
         $paidOrders = Order::whereIn('payment_status', ['captured', 'held']);
@@ -525,9 +466,7 @@ class PaymentController extends Controller
             ], 'Admin dashboard retrieved successfully', 200);
     }
 
-    /**
-     * 8. POST /api/admin/payments/analytics (or summary)
-     */
+    
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
         $query = Order::whereIn('payment_status', ['captured', 'held']);
@@ -579,9 +518,7 @@ class PaymentController extends Controller
         ], 'Admin payments analytics retrieved successfully', 200);
     }
 
-    /**
-     * 9. POST /api/admin/payments/revenue-chart
-     */
+    
     public function adminRevenueChart(Request $request): JsonResponse
     {
         $groupByParam = $request->get('group_by', 'month');
@@ -630,9 +567,7 @@ class PaymentController extends Controller
         return $this->successResponse($chartData, 'Admin revenue chart retrieved successfully', 200);
     }
 
-    /**
-     * 10. POST /api/admin/payments/search
-     */
+    
     public function adminPaymentsSearch(Request $request): JsonResponse
     {
         $query = Order::with(['client', 'package.service.company.region']);
@@ -671,20 +606,15 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Admin payments search retrieved successfully', 200);
     }
 
-    /**
-     * 11. Companies Statistics (Enhanced with Date Filters)
-     */
+    
     public function adminCompaniesStats(Request $request): JsonResponse
 {
-    // بناء استعلام الشركات مع الفلاتر
     $companiesQuery = Company::query();
 
-    // فلترة الشركات حسب المنطقة (وليس الطلبات)
     if ($request->filled('region_id')) {
         $companiesQuery->where('region_id', $request->region_id);
     }
 
-    // فلترة الشركات حسب الخدمة (من خلال العلاقات)
     if ($request->filled('service_id')) {
         $companiesQuery->whereHas('services', function($q) use ($request) {
             $q->where('id', $request->service_id);
@@ -694,12 +624,10 @@ class PaymentController extends Controller
     $companies = $companiesQuery->get();
 
     $result = $companies->map(function ($company) use ($request) {
-        // بناء استعلام الطلبات لهذه الشركة
         $ordersQuery = Order::whereHas('package.service', function($q) use ($company) {
             $q->where('company_id', $company->id);
         });
 
-        // تطبيق فلاتر الطلبات (إذا وجدت)
         if ($request->filled('payment_method')) {
             $ordersQuery->where('payment_method', $request->payment_method);
         }
@@ -712,7 +640,6 @@ class PaymentController extends Controller
             $ordersQuery->whereDate('created_at', '<=', $request->to_date);
         }
 
-        // الطلبات المدفوعة
         $paidOrders = (clone $ordersQuery)->whereIn('payment_status', ['captured', 'held']);
 
         return [
@@ -732,9 +659,8 @@ class PaymentController extends Controller
     return $this->successResponse($result, 'Admin companies statistics retrieved successfully', 200);
 }
 
-    /**
-     * 12. Regions Statistics (Enhanced with Date Filters & Payment Counts)
-     */
+   
+     
     public function adminRegionsStats(Request $request): JsonResponse
     {
         $regions = Region::all()->map(function ($region) use ($request) {
@@ -771,9 +697,7 @@ class PaymentController extends Controller
         return $this->successResponse($regions, 'Admin regions statistics retrieved successfully', 200);
     }
 
-    /**
-     * 13. Services Statistics (Enhanced with Date Filters & Revenue breakdown)
-     */
+   
     public function adminServicesStats(Request $request): JsonResponse
     {
         $services = Service::all()->map(function ($service) use ($request) {
@@ -817,9 +741,7 @@ class PaymentController extends Controller
         return $this->successResponse($services, 'Admin services statistics retrieved successfully', 200);
     }
 
-    /**
-     * 14. GET /api/admin/payments/{payment}
-     */
+    
     public function adminShowPayment($id): JsonResponse
     {
         $order = Order::with(['client', 'package.service.company.region'])->find($id);

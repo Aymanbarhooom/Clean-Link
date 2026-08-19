@@ -28,9 +28,7 @@ class FirebaseService
         return $token['access_token'];
     }
 
-    /**
-     * إرسال إشعار لتوكن واحد
-     */
+ 
     public function sendToToken(string $fcmToken, string $title, string $body, array $data = []): bool
     {
         try {
@@ -45,7 +43,7 @@ class FirebaseService
                         'title' => $title,
                         'body' => $body,
                     ],
-                    'data' => array_map('strval', $data), // FCM بده كل الـ data قيم نصية
+                    'data' => array_map('strval', $data), 
                 ],
             ];
 
