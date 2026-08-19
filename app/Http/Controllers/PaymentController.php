@@ -509,7 +509,7 @@ class PaymentController extends Controller
                     'total' => Order::count(),
                     'pending' => Order::where('status', 'pending')->count(),
                     'assigned_to_worker' => Order::where('status', 'assigned_to_worker')->count(),
-                    'in_route' => Order::where('status', 'in_route')->count(),
+                    'on_way' => Order::where('status', 'on_way')->count(),
                     'in_process' => Order::where('status', 'in_process')->count(),
                     'completed' => Order::where('status', 'completed')->count(),
                     'canceled' => Order::where('status', 'canceled')->count(),
