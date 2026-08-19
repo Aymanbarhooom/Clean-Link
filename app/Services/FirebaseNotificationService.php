@@ -14,13 +14,10 @@ class FirebaseNotificationService
     public function __construct()
     {
         $this->projectId = env('FCM_PROJECT_ID');
-        // استخدام storage_path لضمان الوصول للملف بشكل صحيح
         $this->credentialsPath = storage_path('app/firebase-credentials.json');
     }
 
-    /**
-     * الحصول على Access Token مؤقت من جوجل
-     */
+    
     private function getAccessToken()
     {
         $client = new GoogleClient();
@@ -31,9 +28,6 @@ class FirebaseNotificationService
         return $client->getAccessToken()['access_token'];
     }
 
-    /**
-     * إرسال إشعار لجهاز محدد باستخدام الـ Token
-     */
     public function sendPushNotification($fcmToken, $title, $body, $data = [])
     {
         try {

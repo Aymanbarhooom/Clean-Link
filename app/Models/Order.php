@@ -45,7 +45,6 @@ class Order extends Model
         'is_company_paid' => 'boolean',
     ];
 
-    // --- Relationships ---
 
     public function client(): BelongsTo
     {
@@ -80,7 +79,6 @@ class Order extends Model
         $this->update(['total_price' => $basePrice + $addonsPrice]);
     }
 
-    // أضف هذه الدالة داخل class Order
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);

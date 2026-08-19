@@ -84,7 +84,6 @@ public function unreadComplaints()
 
 
 
-    // --- Helper Functions ---
 
     public function getFinalPriceAttribute(): float
     {
