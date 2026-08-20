@@ -231,7 +231,7 @@ class OrderController extends Controller
         $packageDuration = $totals['duration'];
 
         $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-        $minimumWorkers = (int) ($package->minimum_workers ?? 1);
+        $minimumWorkers = (int) ($totals['duration']/30 ?? 2);
 
         $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
             $q->where('company_id', $company->id);
@@ -447,7 +447,7 @@ class OrderController extends Controller
             $service = $package->service;
             $company = $service->company;
             $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-            $minimumWorkers = (int) ($package->minimum_workers ?? 1);
+            $minimumWorkers = (int) ($totals['duration']/30 ?? 2);
 
             $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
                 $q->where('company_id', $company->id);
