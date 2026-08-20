@@ -188,8 +188,8 @@ class ServiceController extends Controller
         Package::create(
             [
                 'service_id' => $service->id,
-                'name_ar' => $service->name_ar . 'الباقة الأساسية',
-                'name_en' => $service->name_en . 'Basic Package',
+                'name_ar' => 'الباقة المفتوحة',
+                'name_en' => $service->name_en . 'Open Package',
                 'duration' => 0,
                 'price' => 0,
                 'price_after_discount'  =>0,
