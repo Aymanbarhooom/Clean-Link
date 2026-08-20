@@ -15,13 +15,7 @@ class GoogleRoutesService
         $this->apiKey = config('services.google.routes_api_key');
     }
 
-    /**
-     * يحسب زمن القيادة باتجاه واحد فقط (من origin إلى destination) بالدقائق.
-     * بدون بيانات ازدحام حية (static driving duration).
-     *
-     * يُرجع null عند أي فشل (خطأ شبكة، رد غير متوقع، مفتاح API غير صالح...)
-     * بدلاً من رمي استثناء، لإجبار الطبقة الأعلى على التعامل الصريح مع الفشل.
-     */
+    
     public function calculateDrivingRoute(
         float $originLat,
         float $originLng,
@@ -51,7 +45,7 @@ class GoogleRoutesService
                     ],
                 ],
                 'travelMode' => 'DRIVE',
-                'routingPreference' => 'TRAFFIC_UNAWARE', // بدون ازدحام حي، كما اتفقنا
+                'routingPreference' => 'TRAFFIC_UNAWARE', 
             ]);
              \Log::info('GoogleRoutesService DEBUG', [
             'api_key_present' => !empty($this->apiKey),
@@ -67,7 +61,7 @@ class GoogleRoutesService
             }
 
             $data = $response->json();
-            $durationStr = $data['routes'][0]['duration'] ?? null; // مثال: "812s"
+            $durationStr = $data['routes'][0]['duration'] ?? null;
 
             if (!$durationStr) {
                 Log::warning('GoogleRoutesService: no duration in response', ['response' => $data]);
@@ -75,7 +69,7 @@ class GoogleRoutesService
             }
 
             $seconds = (int) rtrim($durationStr, 's');
-            return (int) ceil($seconds / 60); // دقائق، مقرّبة للأعلى
+            return (int) ceil($seconds / 60); 
 
         } catch (\Throwable $e) {
             Log::error('GoogleRoutesService: exception during route calculation', [

@@ -8,23 +8,19 @@ use Illuminate\Pagination\AbstractPaginator;
 
 trait ApiResponse
 {
-    /**
-     * Return a standardized success JSON response.
-     */
+    
     protected function successResponse(mixed $data = [], string $message = 'Operation successful', int $status = 200): JsonResponse
     {
-        // البنية الأساسية للـ Response
         $response = [
             'status'  => $status,
             'message' => $message,
             'data'    => $data,
         ];
 
-        // 1. إذا تم تمرير Resource Collection مصفح (Paginated Resource)
         if ($data instanceof AnonymousResourceCollection && $data->resource instanceof AbstractPaginator) {
             $paginated = $data->resource->toArray();
             
-            $response['data']  = $data->resolve(); // استخراج مصفوفة البيانات النقية المفلترة لغوياً
+            $response['data']  = $data->resolve(); 
             $response['links'] = [
                 'first' => $paginated['first_page_url'] ?? null,
                 'last'  => $paginated['last_page_url'] ?? null,
@@ -40,7 +36,6 @@ trait ApiResponse
                 'total'        => $paginated['total'] ?? null,
             ];
         }
-        // 2. إذا تم تمرير كائن مصفح خام مباشرة (Raw Paginator) دون استدعاء الـ Resource
         elseif ($data instanceof AbstractPaginator) {
             $paginated = $data->toArray();
             

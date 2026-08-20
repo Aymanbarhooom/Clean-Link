@@ -1,6 +1,5 @@
 <?php
 
-// database/seeders/AttributeSeeder.php
 namespace Database\Seeders;
 
 use App\Models\AttributeModel;
