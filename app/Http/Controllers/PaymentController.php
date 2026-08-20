@@ -260,7 +260,7 @@ class PaymentController extends Controller
         $grossRevenue = (float) $query->sum('total_price');
         $totalPayments = $query->count();
 
-        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $cashQuery = (clone $query)->where('payment_method', 'manual');
         $electricQuery = (clone $query)->where('payment_method', 'electric');
 
         return $this->successResponse([
@@ -344,7 +344,7 @@ class PaymentController extends Controller
             ],
             'total_price' => (float) $order->total_price,
             'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
             'payment_status' => $order->payment_status,
             'system_share' => (float) $order->admin_share,
             'company_share' => (float) $order->company_share,
@@ -379,7 +379,7 @@ class PaymentController extends Controller
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'company_profit' => (float) $paidOrders->sum('company_share'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
                 'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
             ];
         });
@@ -498,7 +498,7 @@ class PaymentController extends Controller
         $grossRevenue = (float) $query->sum('total_price');
         $totalPayments = $query->count();
 
-        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $cashQuery = (clone $query)->where('payment_method', 'manual');
         $electricQuery = (clone $query)->where('payment_method', 'electric');
 
         return $this->successResponse([
@@ -649,7 +649,7 @@ class PaymentController extends Controller
             'orders_count' => $ordersQuery->count(),
             'payments_count' => $paidOrders->count(),
             'gross_revenue' => (float) $paidOrders->sum('total_price'),
-            'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+            'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
             'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
             'system_profit' => (float) $paidOrders->sum('admin_share'),
             'company_profit' => (float) $paidOrders->sum('company_share'),
@@ -687,7 +687,7 @@ class PaymentController extends Controller
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
                 'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
@@ -731,7 +731,7 @@ class PaymentController extends Controller
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
                 'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
@@ -773,7 +773,7 @@ class PaymentController extends Controller
                 'name' => $service->name ?? ''
             ],
             'amount' => (float) $order->total_price,
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'cash',
+            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
             'payment_status' => $order->payment_status,
             'system_profit' => (float) $order->admin_share,
             'company_profit' => (float) $order->company_share,
