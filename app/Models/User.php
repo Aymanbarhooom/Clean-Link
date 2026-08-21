@@ -84,6 +84,11 @@ class User extends Authenticatable
         return $this->role === 'company_manager';
     }
 
+    public function canManageCompany(Company $company): bool
+    {
+        return $this->isAdmin() || ($this->isCompanyManager() && $company->manager_id === $this->id);
+    }
+
     public function isRegionManager(): bool
     {
         return $this->role === 'region_manager';
