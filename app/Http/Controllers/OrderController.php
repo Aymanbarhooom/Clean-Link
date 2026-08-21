@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\OrderLocationResource;
+use App\Models\Company;
 use App\Models\Package;
 use App\Models\Order;
 use App\Models\Service;
@@ -231,7 +232,7 @@ class OrderController extends Controller
         $packageDuration = $totals['duration'];
 
         $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-        $minimumWorkers = (int) ($totals['duration']/30 ?? 2);
+        $minimumWorkers = (int) ($totals['duration'] / 30 ?? 2);
 
         $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
             $q->where('company_id', $company->id);
@@ -447,7 +448,7 @@ class OrderController extends Controller
             $service = $package->service;
             $company = $service->company;
             $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-            $minimumWorkers = (int) ($totals['duration']/30 ?? 2);
+            $minimumWorkers = (int) ($totals['duration'] / 30 ?? 2);
 
             $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
                 $q->where('company_id', $company->id);
@@ -665,7 +666,7 @@ class OrderController extends Controller
 
                 'is_done_with_admin' => false,
 
-                'is_company_paid' => $validated['payment_method'] === 'manual', 
+                'is_company_paid' => $validated['payment_method'] === 'manual',
             ]);
 
             $order->payments()->create([
@@ -677,7 +678,7 @@ class OrderController extends Controller
                 'paid_at' => $validated['payment_method'] === 'cash' ? now() : null,
             ]);
 
-            
+
 
             $order->calculateAndSetPaymentShares();
 
@@ -862,8 +863,7 @@ class OrderController extends Controller
                 if ($order->payment_status === 'held') {
                     $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
                     $order->update(['payment_status' => 'refunded']);
-                }
-                elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
+                } elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
                     $stripe->refunds->create([
                         'payment_intent' => $order->stripe_payment_intent_id,
                     ]);
@@ -903,6 +903,18 @@ class OrderController extends Controller
         $perPage = $validated['per_page'] ?? 10;
 
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
+
+        if ($request->filled('company_id')) {
+            $company = Company::find($request->company_id);
+
+            if (!$company || !$user->canManageCompany($company)) {
+                return $this->errorResponse('You do not have permission to view orders for this company', 403);
+            }
+
+            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+                $serviceQuery->where('company_id', $company->id);
+            });
+        }
 
         if (! $this->applyOrderVisibilityScope($query, $user)) {
             return $this->successResponse([
