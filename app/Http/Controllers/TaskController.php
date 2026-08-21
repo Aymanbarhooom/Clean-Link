@@ -39,9 +39,27 @@ class TaskController extends Controller
         return $this->successResponse(TaskResource::collection($tasks), 'Your workgroup tasks logs fetched');
     }
 
-    public function show(Task $task): JsonResponse
+    public function todaySummary(): JsonResponse
     {
         $user = auth()->user();
+
+        if (!$user->isWorker() && !$user->isAdmin()) {
+            return $this->errorResponse('Access restricted to field workers', 403);
+        }
+
+        $todayTasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
+            $query->where('users.id', $user->id);
+        })->whereDate('created_at', today());
+
+        return $this->successResponse([
+            'pending' => (clone $todayTasks)->where('status', 'pending')->count(),
+            'done' => (clone $todayTasks)->where('status', 'done')->count(),
+        ], 'Today task summary fetched');
+    }
+
+    public function show(Task $task): JsonResponse
+    {
+        $user = auth()->user(); 
 
         if (!$user->isWorker() && !$user->isAdmin()) {
             return $this->errorResponse('Access restricted to field workers', 403);
@@ -50,7 +68,7 @@ class TaskController extends Controller
         if (!$user->isAdmin() && !$task->workgroup->workers()->where('users.id', $user->id)->exists()) {
             return $this->errorResponse('Access restricted to task members only', 403);
         }
-        $task->load(['order.package.service.company', 'order.client', 'workgroup.leader']);
+        $task->load(['order.package.service.company', 'order.client', 'workgroup.leader', 'workgroup.workers']);
         return $this->successResponse(
             new TaskResource($task),
             'Task details retrieved successfully'
@@ -61,7 +79,6 @@ class TaskController extends Controller
     {
         $user = auth()->user();
         $workers = $task->workgroup->workers;
-
         $order = $task->order;
         $client = $order->client;
         $client->load('fcmTokens');
