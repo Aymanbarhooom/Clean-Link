@@ -202,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // 👷 مسارات مهام العمال والورشات (Tasks Workflows)
     // ==========================================
+    Route::get('tasks/today-summary', [TaskController::class, 'todaySummary']);
     Route::get('tasks', [TaskController::class, 'index']); // جلب المهام (متاح لكل العمال في الورشة)
     Route::get('tasks/{task}', [TaskController::class, 'show']); // جلب تفاصيل المهمة
     Route::post('tasks/{task}/update-status', [TaskController::class, 'updateStatus']); // تحديث ورفع الصور (للقائد فقط)
