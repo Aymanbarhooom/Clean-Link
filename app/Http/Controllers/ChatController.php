@@ -17,8 +17,7 @@ class ChatController extends Controller
 {
     public function __construct(
         private readonly GeminiChatService $chatService
-    ) {
-    }
+    ) {}
 
 
     public function index(
@@ -26,13 +25,13 @@ class ChatController extends Controller
     ) {
         $conversations =
             ChatConversation::query()
-                ->where(
-                    'user_id',
-                    $request->user()->id
-                )
-                ->withCount('messages')
-                ->latest('updated_at')
-                ->get();
+            ->where(
+                'user_id',
+                $request->user()->id
+            )
+            ->withCount('messages')
+            ->latest('updated_at')
+            ->get();
 
 
         return response()->json([
@@ -64,42 +63,32 @@ class ChatController extends Controller
     }
 
 
-    public function send(
-        SendChatMessageRequest $request
-    ) {
+    public function send(SendChatMessageRequest $request)
+    {
         $user = $request->user();
-
-
         $conversation = null;
-
-
         if ($request->filled('conversation_id')) {
-            $conversation =
-                ChatConversation::query()
-                    ->where(
-                        'id',
-                        $request->integer(
-                            'conversation_id'
-                        )
-                    )
-                    ->where(
-                        'user_id',
-                        $user->id
-                    )
-                    ->firstOrFail();
+            $conversation = ChatConversation::query()->where(
+                'id',
+                $request->integer('conversation_id')
+            )
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->firstOrFail();
         }
-
 
         try {
             $result =
                 $this->chatService
-                    ->send(
-                        $conversation,
-                        $request->string(
-                            'message'
-                        )->toString(),
-                        $user
-                    );
+                ->send(
+                    $conversation,
+                    $request->string(
+                        'message'
+                    )->toString(),
+                    $user
+                );
 
 
             return DB::transaction(
@@ -113,41 +102,39 @@ class ChatController extends Controller
                         $conversation =
                             ChatConversation::create([
                                 'user_id' =>
-                                    $user->id,
+                                $user->id,
                                 'title' =>
-                                    $this->createTitle(
-                                        $request->string(
-                                            'message'
-                                        )->toString()
-                                    ),
+                                $this->createTitle(
+                                    $request->string(
+                                        'message'
+                                    )->toString()
+                                ),
                             ]);
                     }
 
 
                     $userMessage =
                         $conversation
-                            ->messages()
-                            ->create([
-                                'role' => 'user',
-                                'content' =>
-                                    $request->string(
-                                        'message'
-                                    )->toString(),
-                            ]);
+                        ->messages()
+                        ->create([
+                            'role' => 'user',
+                            'content' =>
+                            $request->string(
+                                'message'
+                            )->toString(),
+                        ]);
 
 
                     $assistantMessage =
                         $conversation
-                            ->messages()
-                            ->create([
-                                'role' => 'assistant',
-                                'content' =>
-                                    $result['text'],
-                                'gemini_response_id' =>
-                                    $result[
-                                        'response_id'
-                                    ] ?? null,
-                            ]);
+                        ->messages()
+                        ->create([
+                            'role' => 'assistant',
+                            'content' =>
+                            $result['text'],
+                            'gemini_response_id' =>
+                            $result['response_id'] ?? null,
+                        ]);
 
 
                     $conversation->touch();
@@ -156,11 +143,11 @@ class ChatController extends Controller
                     return response()->json([
                         'data' => [
                             'conversation_id' =>
-                                $conversation->id,
+                            $conversation->id,
                             'user_message' =>
-                                $userMessage,
+                            $userMessage,
                             'assistant_message' =>
-                                $assistantMessage,
+                            $assistantMessage,
                         ],
                     ]);
                 }
@@ -171,7 +158,7 @@ class ChatController extends Controller
 
             return response()->json([
                 'message' =>
-                    'Chat service is currently unavailable.',
+                'Chat service is currently unavailable.',
             ], 503);
         }
     }
@@ -192,7 +179,7 @@ class ChatController extends Controller
 
         return response()->json([
             'message' =>
-                'Conversation deleted successfully.',
+            'Conversation deleted successfully.',
         ]);
     }
 
