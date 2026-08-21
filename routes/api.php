@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyManagerController;
 use App\Http\Controllers\ComplaintController;
@@ -242,7 +243,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // 💳 PAYMENT MANAGEMENT ROUTES
     // ==========================================
-    
+
     // Stripe Payment Intent Creation (Client)
     Route::post('/payments/create-intent', [PaymentController::class, 'createPaymentIntent']);
 
@@ -290,6 +291,16 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/services-statistics', [PaymentController::class, 'adminServicesStats']);    // Service stats
             Route::get('/{payment}', [PaymentController::class, 'adminShowPayment']);                 // Show payment details
         });
+    });
+
+    Route::middleware([
+        'auth:sanctum',
+        'throttle:30,1',
+    ])->group(function () {
+        Route::get('/chat/conversations', [ChatController::class, 'index']);
+        Route::get('/chat/conversations/{conversation}', [ChatController::class, 'show']);
+        Route::post('/chat/messages', [ChatController::class, 'send']);
+        Route::delete('/chat/conversations/{conversation}', [ChatController::class, 'destroy']);
     });
 });
 
