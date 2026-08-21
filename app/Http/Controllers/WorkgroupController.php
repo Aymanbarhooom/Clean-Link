@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\Workgroup;
 use App\Models\User;
 use App\Traits\ApiResponse;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -19,7 +21,7 @@ class WorkgroupController extends Controller
     }
 
     
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
 
@@ -28,6 +30,16 @@ class WorkgroupController extends Controller
         }
 
         $query = Workgroup::with(['leader', 'workers.profile', 'workers.workerProfile.skills']);
+
+         if ($request->filled('company_id')) {
+            $company = Company::find($request->company_id);
+
+            if (!$company || !$user->canManageCompany($company)) {
+                return $this->errorResponse('You do not have permission to view orders for this company', 403);
+            }
+
+            $query->where('company_id', $company->id);
+        }
 
         if ($user->isCompanyManager()) {
             $company = $user->managedCompanies()->first();
