@@ -15,7 +15,8 @@ class TaskResource extends JsonResource
     public function toArray(Request $request): array
     {
        return[
-         'order_id' => $this->order_id,
+        'id' => $this->id,
+        'order_id' => $this->order_id,
         'workgroup_id' => $this->workgroup_id,
         'status' => $this->status,
         'image_before' => $this->image_before ? asset('storage/' . $this->image_before) : null,
