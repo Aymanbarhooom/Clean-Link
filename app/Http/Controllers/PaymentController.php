@@ -288,7 +288,7 @@ class PaymentController extends Controller
 
         if ($request->filled('status')) {
             $query->where('payment_status', $request->status);
-        }
+        } 
 
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->payment_method);
