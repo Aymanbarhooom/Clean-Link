@@ -6,6 +6,7 @@ use App\Models\Service;
 use App\Models\Company;
 use App\Models\AttributeModel;
 use App\Models\Category;
+use App\Models\ServiceImage;
 use App\Models\Skill;
 use Illuminate\Database\Seeder;
 
@@ -66,7 +67,13 @@ class ServiceSeeder extends Seeder
         $s1->requiredSkills()->attach([
             $standardCleaning->id,
             $windowWashing->id
-        ]);
+        ]); 
+
+         ServiceImage::create([
+                    'service_id' => $s1->id,
+                    'image_before' => 'service_secondary/home_before.jpg',
+                    'image_after' => 'service_secondary/home_after.jpg',
+                ]);
 
         $s2 = Service::create([
             'company_id' => $ecoCleanHome->id,
@@ -85,13 +92,18 @@ class ServiceSeeder extends Seeder
         $s2->attributes()->attach([
             $extraRooms->id => ['price' => 25.00, 'duration' => 45],
             $extraBaths->id => ['price' => 35.00, 'duration' => 60],
-            $emptyHouse->id => ['price' => -20.00, 'duration' => -30] 
+            $emptyHouse->id => ['price' => 20.00, 'duration' => 30] 
         ]);
         $s2->requiredSkills()->attach([
             $deepCleaning->id,
             $advancsdBathroom->id,
             $windowWashing->id
         ]);
+        ServiceImage::create([
+                    'service_id' => $s2->id,
+                    'image_before' => 'service_secondary/office_before.jpg',
+                    'image_after' => 'service_secondary/office_after.jpg',
+                ]);
 
         $s3 = Service::create([
             'company_id' => $ecoCleanHome->id,
@@ -116,6 +128,11 @@ class ServiceSeeder extends Seeder
             $windowWashing->id,
             $deepCleaning->id
         ]);
+        ServiceImage::create([
+                    'service_id' => $s3->id,
+                    'image_before' => 'service_secondary/bath_before.jpg',
+                    'image_after' => 'service_secondary/bath_after.jpg',
+                ]);
 
         $s4 = Service::create([
             'company_id' => $ecoCleanHome->id,
@@ -136,6 +153,12 @@ class ServiceSeeder extends Seeder
         ]);
         $s4->requiredSkills()->attach([
             $deepCleaning->id]);
+
+            ServiceImage::create([
+                    'service_id' => $s4->id,
+                    'image_before' => 'service_secondary/kitchen_before.jpg',
+                    'image_after' => 'service_secondary/kitchen_after.jpg',
+                ]);
 
         $s5 = Service::create([
             'company_id' => $ecoCleanHome->id,
@@ -160,6 +183,11 @@ class ServiceSeeder extends Seeder
             $deepCleaning->id
         ]);
 
+        ServiceImage::create([
+                    'service_id' => $s5->id,
+                    'image_before' => 'service_secondary/pool_before.jpg',
+                    'image_after' => 'service_secondary/pool_after.jpg',
+                ]);
 
         $s6 = Service::create([
             'company_id' => $sparkleAuto->id,
@@ -182,6 +210,12 @@ class ServiceSeeder extends Seeder
             $headlights->id,
             $exterior->id
         ]);
+
+        ServiceImage::create([
+                    'service_id' => $s6->id,
+                    'image_before' => 'service_secondary/car_before.jpg',
+                    'image_after' => 'service_secondary/car_after.jpg',
+                ]);
 
         $s7 = Service::create([
             'company_id' => $sparkleAuto->id,
@@ -207,6 +241,13 @@ class ServiceSeeder extends Seeder
             $exterior->id,
             $thermalSteam->id
         ]);
+        
+        ServiceImage::create([
+                    'service_id' => $s7->id,
+                    'image_before' => 'service_secondary/car_before1.jpg',
+                    'image_after' => 'service_secondary/car_after1.jpg',
+                ]);
+
 
         $s8 = Service::create([
             'company_id' => $sparkleAuto->id,
@@ -228,6 +269,13 @@ class ServiceSeeder extends Seeder
         $s8->requiredSkills()->attach([
             $thermalSteam->id,
             $exterior->id]);
+            
+        ServiceImage::create([
+                    'service_id' => $s8->id,
+                    'image_before' => 'service_secondary/car_before.jpg',
+                    'image_after' => 'service_secondary/car_after.jpg',
+                ]);
+
 
         $s9 = Service::create([
             'company_id' => $sparkleAuto->id,
@@ -249,6 +297,13 @@ class ServiceSeeder extends Seeder
         $s9->requiredSkills()->attach([
             $headlights->id,
             $exterior->id]);
+            
+        ServiceImage::create([
+                    'service_id' => $s9->id,
+                    'image_before' => 'service_secondary/car_before1.jpg',
+                    'image_after' => 'service_secondary/car_after1.jpg',
+                ]);
+
 
         $s10 = Service::create([
             'company_id' => $sparkleAuto->id, 
@@ -272,5 +327,13 @@ class ServiceSeeder extends Seeder
         $s10->requiredSkills()->attach([
             $thermalSteam->id,
             $exterior->id]);
+        
+            
+        ServiceImage::create([
+                    'service_id' => $s10->id,
+                    'image_before' => 'service_secondary/car_before.jpg',
+                    'image_after' => 'service_secondary/car_after.jpg',
+                ]);
+
     }
 }

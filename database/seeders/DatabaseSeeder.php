@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
             SkillSeeder::class,
             ServiceSeeder::class,
             PackageSeeder::class,
-            ServiceImageSeeder::class,
+            //ServiceImageSeeder::class,
             ReviewSeeder::class,
             WorkerSeeder::class,
             //WorkGroupeSeeder::class,
