@@ -8,9 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Package extends Model
 {
-    protected $fillable = ['service_id', 'name_ar', 'name_en', 'duration', 'price','price_after_discount', 'details_ar', 'details_en', 'minimum_workers'];
+    protected $fillable = ['service_id', 'name_ar', 'name_en', 'duration', 'price','price_after_discount', 'details_ar', 'details_en', 'minimum_workers', 'is_open_package'];
 
-    protected $appends = ['is_open_package'];
     /**
      * Automatic JSON casting conversion for array structures.
      */
@@ -21,6 +20,7 @@ class Package extends Model
         'price' => 'float',
         'price_after_discount' => 'float',
         'minimum_workers' => 'integer',
+        'is_open_package' => 'boolean',
     ];
 
     public function service(): BelongsTo
@@ -31,10 +31,5 @@ class Package extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
-    }
-
-    public function getIsOpenPackageAttribute(): bool
-    {
-        return $this->name_en === 'Open Package';
     }
 }

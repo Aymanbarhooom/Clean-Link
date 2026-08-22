@@ -193,7 +193,8 @@ class ServiceController extends Controller
                 'price_after_discount'  =>0,
                 'details_ar' => ['الوصف الأساسي للخدمة'],
                 'details_en' => ['Basic service description'],
-                'minimum_workers' => 2
+                'minimum_workers' => 2,
+                'is_open_package' => true,
             ]
         );
 
