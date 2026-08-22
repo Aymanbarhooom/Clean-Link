@@ -357,7 +357,7 @@ class OrderController extends Controller
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
 
-            'payment_method' => 'required|in:electric,manual',
+            'payment_method' => 'required|in:card,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -401,7 +401,7 @@ class OrderController extends Controller
         }
 
         $order = DB::transaction(function () use ($validated, $package, $startTime, $effectiveEndTime, $totalDuration, $travelBufferMinutes, $totals, $pivotPayload) {
-            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
+            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -417,11 +417,11 @@ class OrderController extends Controller
                 'total_price' => $totals['total_price'],
 
                 'payment_method' => $validated['payment_method'],
-                'payment_status' => $validated['payment_method'] === 'electric'
+                'payment_status' => $validated['payment_method'] === 'card'
                     ? 'pending'
                     : 'held',
-                'is_done_with_admin' => false,
-                'is_company_paid' => $validated['payment_method'] === 'manual',
+                'is_done_with_admin' => $validated['payment_method'] === 'card',
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
 
             $order->payments()->create([
@@ -576,7 +576,7 @@ class OrderController extends Controller
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
 
-            'payment_method' => 'required|in:electric,manual',
+            'payment_method' => 'required|in:card,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -639,7 +639,7 @@ class OrderController extends Controller
             $attributeTotals,
             $pivotPayload
         ) {
-            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
+            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -660,13 +660,12 @@ class OrderController extends Controller
 
                 'payment_method' => $validated['payment_method'],
 
-                'payment_status' => $validated['payment_method'] === 'electric'
+                'payment_status' => $validated['payment_method'] === 'card'
                     ? 'pending'
                     : 'held',
 
-                'is_done_with_admin' => false,
-
-                'is_company_paid' => $validated['payment_method'] === 'manual',
+                'is_done_with_admin' => $validated['payment_method'] === 'card',
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
 
             $order->payments()->create([
@@ -856,14 +855,14 @@ class OrderController extends Controller
             return $this->errorResponse('This order cannot be canceled', 422);
         }
 
-        if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
+        if ($order->payment_method === 'card' && $order->stripe_payment_intent_id) {
             try {
                 $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
 
                 if ($order->payment_status === 'held') {
                     $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
                     $order->update(['payment_status' => 'refunded']);
-                } elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
+                } elseif (in_array($order->payment_status, ['captured'], true)) {
                     $stripe->refunds->create([
                         'payment_intent' => $order->stripe_payment_intent_id,
                     ]);
@@ -891,7 +890,7 @@ public function index(Request $request): JsonResponse
 
     $validated = $request->validate([
         'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
-        'payment_status' => ['nullable', 'string', 'in:pending,held,captured,paid,refunded'],
+        'payment_status' => ['nullable', 'string', 'in:pending,held,captured,refunded'],
         'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         'page' => 'sometimes|integer|min:1',
         'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // تعديل هنا لجعل company_id غير مطلوب

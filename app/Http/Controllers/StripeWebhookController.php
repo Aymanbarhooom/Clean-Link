@@ -41,7 +41,7 @@ class StripeWebhookController extends Controller
             switch ($event->type) {
                 case 'payment_intent.amount_capturable_updated':
                 case 'charge.succeeded':
-                    if ($order->payment_method === 'electric' && $object->status === 'requires_capture') {
+                    if ($order->payment_method === 'card' && $object->status === 'requires_capture') {
                         $order->update(['payment_status' => 'held']);
                         $order->payments()->latest()->update([
                             'payment_status' => 'held'
@@ -52,7 +52,7 @@ class StripeWebhookController extends Controller
 
                 case 'payment_intent.succeeded':
                 case 'charge.captured':
-                    if ($order->payment_method === 'electric') {
+                    if ($order->payment_method === 'card') {
                         $order->update([
                             'payment_status' => 'captured',
                             'is_company_paid' => false,
