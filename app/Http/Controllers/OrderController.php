@@ -885,111 +885,125 @@ class OrderController extends Controller
         return $this->successResponse(new OrderResource($order), 'Order cancelled and linked field schedules cleared');
     }
 
-    public function index(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', Order::class);
+public function index(Request $request): JsonResponse
+{
+    $this->authorize('viewAny', Order::class);
 
-        $validated = $request->validate([
-            'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
-            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,paid,refunded'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+    $validated = $request->validate([
+        'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
+        'payment_status' => ['nullable', 'string', 'in:pending,held,captured,paid,refunded'],
+        'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        'page' => 'sometimes|integer|min:1',
+        'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // تعديل هنا لجعل company_id غير مطلوب
+    ]);
 
-        $validated = $request->validate([
-            'page' => 'sometimes|integer|min:1',
-            'per_page' => 'sometimes|integer|min:1|max:100',
-            'company_id' => ['required', 'integer', 'exists:companies,id'],
-        ]);
-        $perPage = $validated['per_page'] ?? 10;
+    $perPage = $validated['per_page'] ?? 10;
 
+    $user = auth()->user();
+
+    // إذا كان المستخدم غير إداري، تحقق من الأذونات
+    if (!$user->isAdmin() && isset($validated['company_id'])) {
         $company = Company::find($validated['company_id']);
-        $user = auth()->user();
-
-        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+        if (!$user->canManageCompany($company)) {
             return $this->errorResponse('You do not have permission to view orders for this company', 403);
         }
-
-        $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
-        $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-            $serviceQuery->where('company_id', $company->id);
-        });
-
-        if (!empty($validated['status'])) {
-            $query->where('status', $validated['status']);
-        }
-
-        if (!empty($validated['payment_status'])) {
-            $normalizedPaymentStatus = $validated['payment_status'] === 'paid' ? 'captured' : $validated['payment_status'];
-            $query->where('payment_status', $normalizedPaymentStatus);
-        }
-
-        $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        $responseData = [
-            'data' => OrderResource::collection($orders->items()),
-            'pagination' => [
-                'current_page' => $orders->currentPage(),
-                'per_page' => $orders->perPage(),
-                'total' => $orders->total(),
-                'last_page' => $orders->lastPage(),
-                'from' => $orders->firstItem(),
-                'to' => $orders->lastItem(),
-                'has_more_pages' => $orders->hasMorePages(),
-            ]
-        ];
-
-        return $this->successResponse($responseData, 'Orders index fetched successfully');
     }
+
+    $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
+
+    // إضافة شرط لتصفية الطلبات حسب company_id إذا كان موجودًا
+    if (isset($validated['company_id'])) {
+        $query->whereHas('package.service', function (Builder $serviceQuery) use ($validated) {
+            $serviceQuery->where('company_id', $validated['company_id']);
+        });
+    }
+
+    // إضافة شرط لتصفية الطلبات حسب الحالة
+    if (!empty($validated['status'])) {
+        $query->where('status', $validated['status']);
+    }
+
+    // إضافة شرط لتصفية الطلبات حسب حالة الدفع
+    if (!empty($validated['payment_status'])) {
+        $normalizedPaymentStatus = $validated['payment_status'] === 'paid' ? 'captured' : $validated['payment_status'];
+        $query->where('payment_status', $normalizedPaymentStatus);
+    }
+
+    // استرجاع الطلبات مع الترتيب والتقسيم
+    $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+    // إعداد البيانات للاستجابة
+    $responseData = [
+        'data' => OrderResource::collection($orders->items()),
+        'pagination' => [
+            'current_page' => $orders->currentPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+            'last_page' => $orders->lastPage(),
+            'from' => $orders->firstItem(),
+            'to' => $orders->lastItem(),
+            'has_more_pages' => $orders->hasMorePages(),
+        ]
+    ];
+
+    return $this->successResponse($responseData, 'Orders index fetched successfully');
+}
 
     /**
      * Return all visible orders that have usable coordinates for map markers.
      */
-    public function locations(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', Order::class);
+public function locations(Request $request): JsonResponse
+{
+    $this->authorize('viewAny', Order::class);
 
-        $validated = $request->validate([
-            'company_id' => ['sometimes', 'integer', 'exists:companies,id'],
-        ]);
+    $validated = $request->validate([
+        'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // company_id غير مطلوب
+    ]);
 
-        $user = auth()->user();
-        $company = Company::find($validated['company_id']);
+    $user = auth()->user();
+    $company = isset($validated['company_id']) ? Company::find($validated['company_id']) : null;
 
-        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
-            return $this->errorResponse('You do not have permission to view orders for this company', 403);
-        }
-
-        $query = Order::query()
-            ->select([
-                'id',
-                'client_id',
-                'package_id',
-                'latitude',
-                'longitude',
-                'status',
-                'location',
-                'start_time',
-                'end_time',
-                'total_price',
-            ])
-            ->with([
-                'client:id,fullname',
-                'package:id,service_id,name_ar,name_en',
-                'package.service:id,name_ar,name_en',
-            ])
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-                $serviceQuery->where('company_id', $company->id);
-            });
-
-        $orders = $query->orderByDesc('created_at')->get();
-
-        return $this->successResponse(
-            OrderLocationResource::collection($orders),
-            'Order locations fetched successfully'
-        );
+    // تحقق من الأذونات فقط إذا كانت company_id موجودة
+    if (!$user->isAdmin() && $company && !$user->canManageCompany($company)) {
+        return $this->errorResponse('You do not have permission to view orders for this company', 403);
     }
+
+    $query = Order::query()
+        ->select([
+            'id',
+            'client_id',
+            'package_id',
+            'latitude',
+            'longitude',
+            'status',
+            'location',
+            'start_time',
+            'end_time',
+            'total_price',
+        ])
+        ->with([
+            'client:id,fullname',
+            'package:id,service_id,name_ar,name_en',
+            'package.service:id,name_ar,name_en',
+        ])
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude');
+
+    // إضافة شرط لتصفية الطلبات حسب company_id إذا كان موجودًا
+    if ($company) {
+        $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+            $serviceQuery->where('company_id', $company->id);
+        });
+    }
+
+    $orders = $query->orderByDesc('created_at')->get();
+
+    return $this->successResponse(
+        OrderLocationResource::collection($orders),
+        'Order locations fetched successfully'
+    );
+}
+
 
     public function show(Order $order): JsonResponse
     {
