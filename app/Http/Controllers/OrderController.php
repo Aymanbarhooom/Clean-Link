@@ -56,7 +56,7 @@ class OrderController extends Controller
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
 
-        if ($oneWayMinutes > 60) {
+        if ($oneWayMinutes > 120) {
             return $this->errorResponse('Far distance! Please try another company or change your location', 422);
         }
 
@@ -224,7 +224,7 @@ class OrderController extends Controller
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
 
-        if ($oneWayMinutes > 60) {
+        if ($oneWayMinutes > 120) {
             return $this->errorResponse('Far distance! Please try another company or change your location', 422);
         }
 

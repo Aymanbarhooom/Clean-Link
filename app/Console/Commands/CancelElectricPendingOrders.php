@@ -17,6 +17,7 @@ class CancelElectricPendingOrders extends Command
         $cutoff = Carbon::now()->subMinutes(10);
         $orders = Order::where('payment_method', 'electric')
             ->where('payment_status', 'pending')
+            ->where('status', '!=', 'canceled')
             ->where('created_at', '<=', $cutoff)
             ->get();
 
