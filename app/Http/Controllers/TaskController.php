@@ -32,7 +32,12 @@ class TaskController extends Controller
         $tasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })
-            ->with(['order.package.service', 'order.client', 'workgroup.leader'])
+            ->with([
+                'order.package.service.company',
+                'order.client.profile',
+                'workgroup.leader.profile',
+                'workgroup.workers.profile',
+            ])
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -68,7 +73,12 @@ class TaskController extends Controller
         if (!$user->isAdmin() && !$task->workgroup->workers()->where('users.id', $user->id)->exists()) {
             return $this->errorResponse('Access restricted to task members only', 403);
         }
-        $task->load(['order.package.service.company', 'order.client', 'workgroup.leader', 'workgroup.workers']);
+        $task->load([
+            'order.package.service.company',
+            'order.client.profile',
+            'workgroup.leader.profile',
+            'workgroup.workers.profile',
+        ]);
         return $this->successResponse(
             new TaskResource($task),
             'Task details retrieved successfully'

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\SkillResource;
+use App\Models\Company;
 use App\Models\Package;
 use App\Models\Service;
 use App\Traits\ApiResponse;
@@ -132,12 +133,6 @@ class ServiceController extends Controller
     {
         $this->authorize('create', Service::class);
 
-        $user = auth()->user();
-        $company = $user->managedCompanies()->first();
-
-        if (!$company) {
-            return $this->errorResponse('No registered business organization profile linked to your account context', 422);
-        }
 
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
@@ -159,6 +154,9 @@ class ServiceController extends Controller
             'attributes.*.price' => 'required|numeric|min:-100000', // Allows negative tracking offsets if needed
             'attributes.*.duration' => 'required|integer|min:-1440',
         ]);
+
+        $company = Company::find($validated['company_id']);
+
         if($request->hasFile('image')) {
             $path = $request->file('image')->store('service_images', 'public');
             $validated['image'] = $path;

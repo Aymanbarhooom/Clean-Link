@@ -21,7 +21,7 @@ class WorkgroupController extends Controller
     }
 
     
-    public function index(Request $request): JsonResponse
+    public function index(Company $company): JsonResponse
     {
         $user = auth()->user();
 
@@ -31,26 +31,16 @@ class WorkgroupController extends Controller
 
         $query = Workgroup::with(['leader', 'workers.profile', 'workers.workerProfile.skills']);
 
-         if ($request->filled('company_id')) {
-            $company = Company::find($request->company_id);
-
-            if (!$company || !$user->canManageCompany($company)) {
-                return $this->errorResponse('You do not have permission to view orders for this company', 403);
-            }
-
-            $query->where('company_id', $company->id);
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
         }
 
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-            $query->where('company_id', $company->id);
-        }
+        $query->where('company_id', $company->id);
 
         return $this->successResponse($query->get(), 'Workforce groups successfully synchronized');
     }
 
-    public function activeWorkGroups(): JsonResponse
+    public function activeWorkGroups(Company $company): JsonResponse
     {
         $user = auth()->user();
 
@@ -63,11 +53,11 @@ class WorkgroupController extends Controller
                 $taskQuery->whereIn('status', ['pending', 'on_way', 'handling']);
             });
 
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-            $query->where('company_id', $company->id);
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
         }
+
+        $query->where('company_id', $company->id);
 
         return $this->successResponse($query->get(), 'Active workgroups successfully retrieved');
     }
@@ -75,23 +65,15 @@ class WorkgroupController extends Controller
     public function show(Workgroup $workgroup): JsonResponse
     {
         $user = auth()->user();
-
-        if (!$user->isCompanyManager() && !$user->isAdmin()) {
-            return $this->errorResponse('Access restricted to organizational managers', 403);
-        }
-
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-
-            if ($workgroup->company_id !== $company->id) {
-                return $this->errorResponse('Unauthorized access to this workgroup', 403);
-            }
-        }
-
+        $company = $workgroup->company;
+        if (($user->isCompanyManager() && $company->manager_id === $user->id) || !$user->isAdmin()) {
+             
         $workgroup->load(['leader', 'workers.profile', 'workers.workerProfile.skills', 'tasks.order.package.service']);
 
         return $this->successResponse($workgroup, 'Workgroup details retrieved successfully');
+        }
+        return $this->errorResponse('Access restricted to organizational managers', 403);
+       
     }
 
    

@@ -895,41 +895,24 @@ class OrderController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $user = auth()->user();
         $validated = $request->validate([
             'page' => 'sometimes|integer|min:1',
             'per_page' => 'sometimes|integer|min:1|max:100',
+            'company_id' => ['required', 'integer', 'exists:companies,id'],
         ]);
         $perPage = $validated['per_page'] ?? 10;
 
+        $company = Company::find($validated['company_id']);
+        $user = auth()->user();
+
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
+        }
+
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
-
-        if ($request->filled('company_id')) {
-            $company = Company::find($request->company_id);
-
-            if (!$company || !$user->canManageCompany($company)) {
-                return $this->errorResponse('You do not have permission to view orders for this company', 403);
-            }
-
-            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-                $serviceQuery->where('company_id', $company->id);
-            });
-        }
-
-        if (! $this->applyOrderVisibilityScope($query, $user)) {
-            return $this->successResponse([
-                'data' => [],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => null,
-                    'to' => null,
-                    'has_more_pages' => false,
-                ]
-            ], 'No company registered');
-        }
+        $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+            $serviceQuery->where('company_id', $company->id);
+        });
 
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
@@ -965,6 +948,17 @@ class OrderController extends Controller
     {
         $this->authorize('viewAny', Order::class);
 
+        $validated = $request->validate([
+            'company_id' => ['sometimes', 'integer', 'exists:companies,id'],
+        ]);
+
+        $user = auth()->user();
+        $company = Company::find($validated['company_id']);
+
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
+        }
+
         $query = Order::query()
             ->select([
                 'id',
@@ -984,11 +978,10 @@ class OrderController extends Controller
                 'package.service:id,name_ar,name_en',
             ])
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude');
-
-        if (! $this->applyOrderVisibilityScope($query, auth()->user())) {
-            return $this->successResponse([], 'No company registered');
-        }
+            ->whereNotNull('longitude')
+            ->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+                $serviceQuery->where('company_id', $company->id);
+            });
 
         $orders = $query->orderByDesc('created_at')->get();
 
@@ -1006,43 +999,6 @@ class OrderController extends Controller
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
-
-    /**
-     * Apply the same role and company boundaries used by the Orders index.
-     */
-    private function applyOrderVisibilityScope(Builder $query, User $user): bool
-    {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-
-            if (! $company) {
-                return false;
-            }
-
-            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-                $serviceQuery->where('company_id', $company->id);
-            });
-
-            return true;
-        }
-
-        if ($user->role === 'region_manager') {
-            $query->whereHas('package.service.company', function (Builder $companyQuery) use ($user) {
-                $companyQuery->whereIn('region_id', $user->managedRegions()->pluck('id'));
-            });
-
-            return true;
-        }
-
-        $query->where('client_id', $user->id);
-
-        return true;
-    }
-
 
     private function combinations(array $items, int $k): array
     {
