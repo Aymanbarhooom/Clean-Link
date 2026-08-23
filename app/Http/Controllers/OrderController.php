@@ -460,6 +460,16 @@ class OrderController extends Controller
                 ->get();
 
             if ($eligibleWorkers->count() >= $minimumWorkers) {
+                    $this->lockEligibleWorkers($eligibleWorkers);
+                    $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
+                        $q->where('company_id', $company->id);
+                    })
+                        ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
+                            $q->whereIn('skills.id', $requiredSkillIds);
+                        })
+                        ->with(['workerProfile.skills', 'profile'])
+                        ->get();
+
                 $combinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
                 $found = null;
                 foreach ($combinations as $combo) {
