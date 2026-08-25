@@ -47,11 +47,38 @@ return [
 
     'gemini' => [
         'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'models' => (static function (): array {
+            $defaults = [
+                'gemini-3.6-flash',
+                'gemini-3.7-flash',
+                'gemini-3.5-flash',
+                'gemini-3.5-flash-lite',
+                'gemini-3.1-flash-lite',
+                'gemini-2.5-flash-lite',
+                'gemini-3-flash-preview',
+                'gemini-2.5-flash'
+            ];
+            $configured = trim((string) env('GEMINI_MODELS', ''));
+
+            if ($configured === '') {
+                $legacyModel = trim((string) env('GEMINI_MODEL', ''));
+                $configured = implode(',', array_filter([
+                    $legacyModel,
+                    ...$defaults,
+                ]));
+            }
+
+            return array_values(array_unique(array_filter(array_map(
+                static fn (string $model): string => trim($model),
+                explode(',', $configured)
+            ))));
+        })(),
         'base_url' => env(
             'GEMINI_BASE_URL',
             'https://generativelanguage.googleapis.com/v1beta'
         ),
+        'retry_attempts' => (int) env('GEMINI_RETRY_ATTEMPTS', 2),
+        'retry_delay_ms' => (int) env('GEMINI_RETRY_DELAY_MS', 250),
     ],
 
 

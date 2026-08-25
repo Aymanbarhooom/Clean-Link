@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 
 
 use App\Http\Controllers\Controller;
+use App\Exceptions\Chat\AllGeminiModelsExhaustedException;
+use App\Exceptions\Chat\GeminiConnectionException;
+use App\Exceptions\Chat\GeminiRequestException;
+use App\Exceptions\Chat\GeminiTemporaryUnavailableException;
 use App\Http\Requests\SendChatMessageRequest;
 use App\Models\ChatConversation;
 use App\Services\Chat\GeminiChatService;
@@ -79,6 +83,13 @@ class ChatController extends Controller
                 ->firstOrFail();
         }
 
+        if (!$conversation) {
+            $conversation = ChatConversation::create([
+                'user_id' => $user->id,
+                'title' => $this->createTitle($request->string('message')->toString()),
+            ]);
+        }
+
         try {
             $result =
                 $this->chatService
@@ -98,21 +109,6 @@ class ChatController extends Controller
                     $user,
                     $result
                 ) {
-                    if (!$conversation) {
-                        $conversation =
-                            ChatConversation::create([
-                                'user_id' =>
-                                $user->id,
-                                'title' =>
-                                $this->createTitle(
-                                    $request->string(
-                                        'message'
-                                    )->toString()
-                                ),
-                            ]);
-                    }
-
-
                     $userMessage =
                         $conversation
                         ->messages()
@@ -132,6 +128,8 @@ class ChatController extends Controller
                             'role' => 'assistant',
                             'content' =>
                             $result['text'],
+                            'action' =>
+                            $result['action'] ?? null,
                             'gemini_response_id' =>
                             $result['response_id'] ?? null,
                         ]);
@@ -148,18 +146,48 @@ class ChatController extends Controller
                             $userMessage,
                             'assistant_message' =>
                             $assistantMessage,
+                            'action' =>
+                            $result['action'] ?? null,
                         ],
                     ]);
                 }
             );
+        } catch (AllGeminiModelsExhaustedException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'The AI assistant has reached its free usage limit for now. Please try again later.',
+                'code' => 'CHAT_QUOTA_EXCEEDED',
+            ], 429);
+        } catch (GeminiConnectionException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'The AI assistant cannot connect right now. Please try again shortly.',
+                'code' => 'CHAT_CONNECTION_ERROR',
+            ], 503);
+        } catch (GeminiTemporaryUnavailableException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'The AI assistant is temporarily unavailable. Please try again in a moment.',
+                'code' => 'CHAT_TEMPORARILY_UNAVAILABLE',
+            ], 503);
+        } catch (GeminiRequestException $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => "We couldn't complete your message right now. Please try again.",
+                'code' => 'CHAT_ERROR',
+            ], 500);
         } catch (Throwable $exception) {
             report($exception);
 
 
             return response()->json([
-                'message' =>
-                'Chat service is currently unavailable.',
-            ], 503);
+                'message' => "We couldn't complete your message right now. Please try again.",
+                'code' => 'CHAT_ERROR',
+            ], 500);
         }
     }
 

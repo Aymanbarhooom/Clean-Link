@@ -14,8 +14,11 @@ class ChatMessage extends Model
         'chat_conversation_id',
         'role',
         'content',
+        'action',
         'gemini_response_id',
     ];
+
+    protected $casts = ['action' => 'array'];
 
 
     public function conversation(): BelongsTo

@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 
 class ChatConversation extends Model
@@ -26,5 +27,10 @@ class ChatConversation extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(ChatMessage::class);
+    }
+
+    public function bookingDraft(): HasOne
+    {
+        return $this->hasOne(ChatBookingDraft::class);
     }
 }
