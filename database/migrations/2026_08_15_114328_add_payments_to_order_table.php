@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
-            $table->enum('payment_method', ['electric', 'manual'])
-                  ->default('manual')
+            $table->enum('payment_method', ['card', 'cash'])
+                  ->default('cash')
                   ->after('total_price');
 
             $table->enum('payment_status', ['pending', 'held', 'captured', 'refunded', 'failed'])

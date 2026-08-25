@@ -210,7 +210,7 @@ class TaskController extends Controller
         }
 
         if ($validated['status'] === 'on_way') {
-            if ($order->payment_method === 'electric' && in_array($order->payment_status, ['held', 'paid'], true) && $order->stripe_payment_intent_id) {
+            if ($order->payment_method === 'card' && in_array($order->payment_status, ['held', 'captured'], true) && $order->stripe_payment_intent_id) {
                 try {
                     $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
                     $stripe->paymentIntents->capture($order->stripe_payment_intent_id);
@@ -220,7 +220,7 @@ class TaskController extends Controller
                         'is_company_paid' => false,
                     ]);
                     $order->payments()->latest()->update([
-                        'payment_status' => 'paid',
+                        'payment_status' => 'captured',
                         'paid_at' => now(),
                     ]);
                 } catch (\Exception $e) {

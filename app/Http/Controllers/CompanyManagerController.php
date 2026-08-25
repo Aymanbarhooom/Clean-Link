@@ -48,36 +48,36 @@ class CompanyManagerController extends Controller
         return $this->successResponse($worker->load('workerProfile'), 'Worker profile built successfully', 211);
     }
 
-   public function getWorkers(Request $request, Company $company): JsonResponse
-{
-    $validated = $request->validate([
-        'page' => 'sometimes|integer|min:1',
-        'per_page' => 'sometimes|integer|min:1|max:100',
-    ]);
-    $perPage = $validated['per_page'] ?? 6;
-    
-    $workers = User::with(['profile', 'workerProfile'])
-        ->whereHas('workerProfile', function ($query) use ($company) {
-            $query->where('company_id', $company->id);
-        })
-        ->orderBy('id', 'asc')
-        ->paginate($perPage);
-    
-    $responseData = [
-        'data' => $workers->items(),
-        'pagination' => [
-            'current_page' => $workers->currentPage(),
-            'per_page' => $workers->perPage(),
-            'total' => $workers->total(),
-            'last_page' => $workers->lastPage(),
-            'from' => $workers->firstItem(),
-            'to' => $workers->lastItem(),
-            'has_more_pages' => $workers->hasMorePages(),
-        ]
-    ];
+    public function getWorkers(Request $request, Company $company): JsonResponse
+    {
+        $validated = $request->validate([
+            'page' => 'sometimes|integer|min:1',
+            'per_page' => 'sometimes|integer|min:1|max:100',
+        ]);
+        $perPage = $validated['per_page'] ?? 6;
 
-    return $this->successResponse($responseData, 'Workers lookup index fetched');
-}
+        $workers = User::with(['profile', 'workerProfile'])
+            ->whereHas('workerProfile', function ($query) use ($company) {
+                $query->where('company_id', $company->id);
+            })
+            ->orderBy('id', 'asc')
+            ->paginate($perPage);
+
+        $responseData = [
+            'data' => $workers->items(),
+            'pagination' => [
+                'current_page' => $workers->currentPage(),
+                'per_page' => $workers->perPage(),
+                'total' => $workers->total(),
+                'last_page' => $workers->lastPage(),
+                'from' => $workers->firstItem(),
+                'to' => $workers->lastItem(),
+                'has_more_pages' => $workers->hasMorePages(),
+            ]
+        ];
+
+        return $this->successResponse($responseData, 'Workers lookup index fetched');
+    }
 
     public function searchWorker(Request $request): JsonResponse
     {
@@ -89,18 +89,40 @@ class CompanyManagerController extends Controller
 
         $validated = $request->validate([
             'query' => 'required|string|min:1',
+            'company_id' => 'sometimes|integer|exists:companies,id',
             'page' => 'sometimes|integer|min:1',
             'per_page' => 'sometimes|integer|min:1|max:100',
         ]);
 
         $query = trim($validated['query']);
         $perPage = $validated['per_page'] ?? 10;
+        $companyId = $validated['company_id'] ?? null;
 
         $workersQuery = User::with(['profile', 'workerProfile'])
-            ->whereHas('workerProfile', function ($workerProfileQuery) use ($user) {
+            ->whereHas('workerProfile', function ($workerProfileQuery) use ($user, $companyId) {
+                // إذا كان المستخدم مدير شركة
                 if ($user->isCompanyManager()) {
                     $companyIds = $user->managedCompanies()->pluck('companies.id');
-                    $workerProfileQuery->whereIn('company_id', $companyIds);
+
+                    // إذا تم إدخال company_id، تحقق من أن الشركة ضمن شركات المدير
+                    if ($companyId) {
+                        if (!$companyIds->contains($companyId)) {
+                            // إذا كانت الشركة غير مسموح للمدير بالوصول إليها
+                            $workerProfileQuery->whereIn('company_id', collect([])); // لا يعيد أي نتائج
+                        } else {
+                            $workerProfileQuery->where('company_id', $companyId);
+                        }
+                    } else {
+                        // إذا لم يتم إدخال company_id، ابحث في كل شركات المدير
+                        $workerProfileQuery->whereIn('company_id', $companyIds);
+                    }
+                } else {
+                    // إذا كان المستخدم أدمن
+                    if ($companyId) {
+                        // ابحث في شركة محددة
+                        $workerProfileQuery->where('company_id', $companyId);
+                    }
+                    // إذا لم يتم إدخال company_id، ابحث في كل الشركات (بدون فلتر)
                 }
             })
             ->where(function ($searchQuery) use ($query) {

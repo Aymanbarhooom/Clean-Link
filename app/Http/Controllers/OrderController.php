@@ -56,7 +56,7 @@ class OrderController extends Controller
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
 
-        if ($oneWayMinutes > 60) {
+        if ($oneWayMinutes > 120) {
             return $this->errorResponse('Far distance! Please try another company or change your location', 422);
         }
 
@@ -224,7 +224,7 @@ class OrderController extends Controller
             return $this->errorResponse('Unable to calculate travel time, please try again', 503);
         }
 
-        if ($oneWayMinutes > 60) {
+        if ($oneWayMinutes > 120) {
             return $this->errorResponse('Far distance! Please try another company or change your location', 422);
         }
 
@@ -357,7 +357,7 @@ class OrderController extends Controller
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.qty' => 'required|integer|min:1',
 
-            'payment_method' => 'required|in:electric,manual',
+            'payment_method' => 'required|in:card,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -401,7 +401,7 @@ class OrderController extends Controller
         }
 
         $order = DB::transaction(function () use ($validated, $package, $startTime, $effectiveEndTime, $totalDuration, $travelBufferMinutes, $totals, $pivotPayload) {
-            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
+            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -417,11 +417,11 @@ class OrderController extends Controller
                 'total_price' => $totals['total_price'],
 
                 'payment_method' => $validated['payment_method'],
-                'payment_status' => $validated['payment_method'] === 'electric'
+                'payment_status' => $validated['payment_method'] === 'card'
                     ? 'pending'
                     : 'held',
-                'is_done_with_admin' => false,
-                'is_company_paid' => $validated['payment_method'] === 'manual',
+                'is_done_with_admin' => $validated['payment_method'] === 'card',
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
 
             $order->payments()->create([
@@ -460,6 +460,16 @@ class OrderController extends Controller
                 ->get();
 
             if ($eligibleWorkers->count() >= $minimumWorkers) {
+                    $this->lockEligibleWorkers($eligibleWorkers);
+                    $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
+                        $q->where('company_id', $company->id);
+                    })
+                        ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
+                            $q->whereIn('skills.id', $requiredSkillIds);
+                        })
+                        ->with(['workerProfile.skills', 'profile'])
+                        ->get();
+
                 $combinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
                 $found = null;
                 foreach ($combinations as $combo) {
@@ -573,10 +583,10 @@ class OrderController extends Controller
             'location' => 'required|string|max:500',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'start_time' => 'required|date|after:now',
+            'start_time' => 'required|date|after:now,before:now + 30 days',
             'note' => 'nullable|string|max:1000',
 
-            'payment_method' => 'required|in:electric,manual',
+            'payment_method' => 'required|in:card,cash',
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
@@ -639,7 +649,7 @@ class OrderController extends Controller
             $attributeTotals,
             $pivotPayload
         ) {
-            $paymentStatus = $validated['payment_method'] === 'electric' ? 'pending' : 'held';
+            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
             $order = Order::create([
                 'client_id' => auth()->id(),
                 'package_id' => $package->id,
@@ -660,13 +670,12 @@ class OrderController extends Controller
 
                 'payment_method' => $validated['payment_method'],
 
-                'payment_status' => $validated['payment_method'] === 'electric'
+                'payment_status' => $validated['payment_method'] === 'card'
                     ? 'pending'
                     : 'held',
 
-                'is_done_with_admin' => false,
-
-                'is_company_paid' => $validated['payment_method'] === 'manual',
+                'is_done_with_admin' => $validated['payment_method'] === 'card',
+                'is_company_paid' => $validated['payment_method'] === 'cash',
             ]);
 
             $order->payments()->create([
@@ -711,6 +720,15 @@ class OrderController extends Controller
                 ->get();
 
             if ($eligibleWorkers->count() >= $minimumWorkers) {
+                $this->lockEligibleWorkers($eligibleWorkers);
+                $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
+                    $q->where('company_id', $company->id);
+                })
+                    ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
+                        $q->whereIn('skills.id', $requiredSkillIds);
+                    })
+                    ->with(['workerProfile.skills', 'profile'])
+                    ->get();
 
                 $combinations = $this->combinations(
                     $eligibleWorkers->values()->all(),
@@ -835,6 +853,7 @@ class OrderController extends Controller
                 }
             }
         } catch (\Exception $e) {
+            Log::error('Auto-assignment failed for order #' . $order->id . ': ' . $e->getMessage());
         }
 
         return $this->successResponse(
@@ -856,14 +875,14 @@ class OrderController extends Controller
             return $this->errorResponse('This order cannot be canceled', 422);
         }
 
-        if ($order->payment_method === 'electric' && $order->stripe_payment_intent_id) {
+        if ($order->payment_method === 'card' && $order->stripe_payment_intent_id) {
             try {
                 $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
 
                 if ($order->payment_status === 'held') {
                     $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
                     $order->update(['payment_status' => 'refunded']);
-                } elseif (in_array($order->payment_status, ['paid', 'captured'], true)) {
+                } elseif (in_array($order->payment_status, ['captured'], true)) {
                     $stripe->refunds->create([
                         'payment_intent' => $order->stripe_payment_intent_id,
                     ]);
@@ -891,57 +910,48 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
-            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,paid,refunded'],
+            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,refunded'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => 'sometimes|integer|min:1',
+            'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // تعديل هنا لجعل company_id غير مطلوب
         ]);
 
-        $user = auth()->user();
-        $validated = $request->validate([
-            'page' => 'sometimes|integer|min:1',
-            'per_page' => 'sometimes|integer|min:1|max:100',
-        ]);
         $perPage = $validated['per_page'] ?? 10;
+
+        $user = auth()->user();
+
+        // إذا كان المستخدم غير إداري، تحقق من الأذونات
+        if (!$user->isAdmin() && isset($validated['company_id'])) {
+            $company = Company::find($validated['company_id']);
+            if (!$user->canManageCompany($company)) {
+                return $this->errorResponse('You do not have permission to view orders for this company', 403);
+            }
+        }
 
         $query = Order::with(['client.profile', 'package.service.company', 'tasks.workgroup.leader.profile']);
 
-        if ($request->filled('company_id')) {
-            $company = Company::find($request->company_id);
-
-            if (!$company || !$user->canManageCompany($company)) {
-                return $this->errorResponse('You do not have permission to view orders for this company', 403);
-            }
-
-            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-                $serviceQuery->where('company_id', $company->id);
+        // إضافة شرط لتصفية الطلبات حسب company_id إذا كان موجودًا
+        if (isset($validated['company_id'])) {
+            $query->whereHas('package.service', function (Builder $serviceQuery) use ($validated) {
+                $serviceQuery->where('company_id', $validated['company_id']);
             });
         }
 
-        if (! $this->applyOrderVisibilityScope($query, $user)) {
-            return $this->successResponse([
-                'data' => [],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                    'last_page' => 1,
-                    'from' => null,
-                    'to' => null,
-                    'has_more_pages' => false,
-                ]
-            ], 'No company registered');
-        }
-
+        // إضافة شرط لتصفية الطلبات حسب الحالة
         if (!empty($validated['status'])) {
             $query->where('status', $validated['status']);
         }
 
+        // إضافة شرط لتصفية الطلبات حسب حالة الدفع
         if (!empty($validated['payment_status'])) {
             $normalizedPaymentStatus = $validated['payment_status'] === 'paid' ? 'captured' : $validated['payment_status'];
             $query->where('payment_status', $normalizedPaymentStatus);
         }
 
+        // استرجاع الطلبات مع الترتيب والتقسيم
         $orders = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
+        // إعداد البيانات للاستجابة
         $responseData = [
             'data' => OrderResource::collection($orders->items()),
             'pagination' => [
@@ -965,6 +975,18 @@ class OrderController extends Controller
     {
         $this->authorize('viewAny', Order::class);
 
+        $validated = $request->validate([
+            'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // company_id غير مطلوب
+        ]);
+
+        $user = auth()->user();
+        $company = isset($validated['company_id']) ? Company::find($validated['company_id']) : null;
+
+        // تحقق من الأذونات فقط إذا كانت company_id موجودة
+        if (!$user->isAdmin() && $company && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
+        }
+
         $query = Order::query()
             ->select([
                 'id',
@@ -986,8 +1008,11 @@ class OrderController extends Controller
             ->whereNotNull('latitude')
             ->whereNotNull('longitude');
 
-        if (! $this->applyOrderVisibilityScope($query, auth()->user())) {
-            return $this->successResponse([], 'No company registered');
+        // إضافة شرط لتصفية الطلبات حسب company_id إذا كان موجودًا
+        if ($company) {
+            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
+                $serviceQuery->where('company_id', $company->id);
+            });
         }
 
         $orders = $query->orderByDesc('created_at')->get();
@@ -998,6 +1023,7 @@ class OrderController extends Controller
         );
     }
 
+
     public function show(Order $order): JsonResponse
     {
         $this->authorize('view', $order);
@@ -1006,43 +1032,6 @@ class OrderController extends Controller
 
         return $this->successResponse(new OrderResource($order), 'Order detailed parameters retrieved');
     }
-
-    /**
-     * Apply the same role and company boundaries used by the Orders index.
-     */
-    private function applyOrderVisibilityScope(Builder $query, User $user): bool
-    {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-
-            if (! $company) {
-                return false;
-            }
-
-            $query->whereHas('package.service', function (Builder $serviceQuery) use ($company) {
-                $serviceQuery->where('company_id', $company->id);
-            });
-
-            return true;
-        }
-
-        if ($user->role === 'region_manager') {
-            $query->whereHas('package.service.company', function (Builder $companyQuery) use ($user) {
-                $companyQuery->whereIn('region_id', $user->managedRegions()->pluck('id'));
-            });
-
-            return true;
-        }
-
-        $query->where('client_id', $user->id);
-
-        return true;
-    }
-
 
     private function combinations(array $items, int $k): array
     {
@@ -1143,5 +1132,23 @@ class OrderController extends Controller
             ->exists();
 
         return !$conflict;
+    }
+
+    /**
+     * قفل العمال المؤهلين للتحقق من عدم التضارب
+     */
+    private function lockEligibleWorkers($eligibleWorkers): void
+    {
+        // استخراج IDs العمال المؤهلين
+        $workerIds = $eligibleWorkers->pluck('id')->toArray();
+
+        if (empty($workerIds)) {
+            return;
+        }
+
+        // 🔒 قفل العمال في قاعدة البيانات
+        User::whereIn('id', $workerIds)
+            ->lockForUpdate()
+            ->get();
     }
 }

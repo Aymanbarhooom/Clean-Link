@@ -183,8 +183,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // ==========================================
     // 👥 Operational Crews & Workgroups Management
     // ==========================================
-    Route::get('workgroups/active', [WorkgroupController::class, 'activeWorkGroups']);
-    Route::apiResource('workgroups', WorkgroupController::class);
+    Route::get('companies/{company}/workgroups/active', [WorkgroupController::class, 'activeWorkGroups']);
+    Route::get('companies/{company}/workgroups', [WorkgroupController::class, 'index']);
+    Route::apiResource('workgroups', WorkgroupController::class)->except(['index']);
 
 
     Route::get('packages/{package}/available-slots', [OrderController::class, 'getAvailableSlots']);

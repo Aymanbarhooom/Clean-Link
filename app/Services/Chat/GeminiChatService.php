@@ -178,6 +178,7 @@ class GeminiChatService
             );
             $functionResponseParts = [];
 
+
             foreach ($functionCalls as $functionCall) {
                 $name = $functionCall['name'] ?? '';
                 $arguments = $functionCall['args'] ?? [];
@@ -208,14 +209,17 @@ class GeminiChatService
                     ],
                 ];
 
+
                 if ($id) {
                     $functionResponse['id'] = $id;
                 }
+
 
                 $functionResponseParts[] = [
                     'functionResponse' => $functionResponse,
                 ];
             }
+
 
             $contents[] = [
                 'role' => 'user',
@@ -499,6 +503,7 @@ class GeminiChatService
     ): array {
         $contents = [];
 
+
         if ($conversation) {
             $messages = $conversation
                 ->messages()
@@ -507,6 +512,7 @@ class GeminiChatService
                 ->get()
                 ->reverse()
                 ->values();
+
 
             foreach ($messages as $message) {
                 $contents[] = [
@@ -589,6 +595,7 @@ class GeminiChatService
                 $text .= $part['text'];
             }
         }
+
 
         return trim($text);
     }

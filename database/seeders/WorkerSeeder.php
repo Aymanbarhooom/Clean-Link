@@ -53,18 +53,26 @@ class WorkerSeeder extends Seeder
 
         $nameIndex = 0;
 
+        $companyCount = 0; // تهيئة عداد للشركات
+
         foreach ($companies as $company) {
-           $this->command->info("Adding $company->id company workers distributed across 10 companies!");
-            for ($i = 0; $i < 10; $i++) {
+            $companyCount++; // زيادة العداد لكل شركة
+
+            // تحديد عدد العمال بناءً على رقم الشركة
+            $numberOfWorkersToAdd = ($companyCount <= 2) ? 10 : 5;
+
+            $this->command->info("Adding $numberOfWorkersToAdd workers for company ID: $company->id");
+
+            for ($i = 0; $i < $numberOfWorkersToAdd; $i++) {
                 $currentFullName = $fullNames[$nameIndex];
-                
+
                 $emailPrefix = Str::slug($currentFullName, '.');
                 $uniqueEmail = $emailPrefix . '@example.com';
 
                 $user = User::create([
                     'fullname' => $currentFullName,
                     'email'    => $uniqueEmail,
-                    'password' => Hash::make('password123'), 
+                    'password' => Hash::make('password123'),
                     'role'     => 'worker',
                 ]);
 
@@ -79,7 +87,7 @@ class WorkerSeeder extends Seeder
                     'user_id'          => $user->id,
                     'company_id'       => $company->id,
                     'experience_years' => rand(1, 15),
-                    'rating'           => rand(30, 50) / 10, 
+                    'rating'           => rand(30, 50) / 10,
                 ]);
 
                 $allSkills = Skill::take(7)->get();
@@ -98,6 +106,7 @@ class WorkerSeeder extends Seeder
                 $nameIndex++;
             }
         }
+
 
         $this->command->info('Successfully seeded 100 workers distributed across 10 companies!');
     }

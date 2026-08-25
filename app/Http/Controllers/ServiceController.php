@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\SkillResource;
+use App\Models\Company;
 use App\Models\Package;
 use App\Models\Service;
 use App\Traits\ApiResponse;
@@ -34,7 +35,7 @@ class ServiceController extends Controller
         'per_page' => 'sometimes|integer|min:1|max:100',
     ]);
     $perPage = $validated['per_page'] ?? 6;
-    
+
     $query = Service::with(['company.region','category']);
 
     // Allow conditional filtering by company context if passed by the frontend
@@ -71,9 +72,9 @@ class ServiceController extends Controller
     public function show(Service $service): JsonResponse
     {
         $service->load([
-            'company', 
+            'company',
             'category',
-            'packages', 
+            'packages',
             'attributes',
             'reviews.client.profile',
             'images',
@@ -132,12 +133,6 @@ class ServiceController extends Controller
     {
         $this->authorize('create', Service::class);
 
-        $user = auth()->user();
-        $company = $user->managedCompanies()->first();
-
-        if (!$company) {
-            return $this->errorResponse('No registered business organization profile linked to your account context', 422);
-        }
 
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
@@ -152,13 +147,16 @@ class ServiceController extends Controller
             'maximum_price' => 'required|numeric|gte:minimum_price',
             'discount' => 'nullable|numeric|min:0|lte:maximum_price',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
-            
+
             // Nested validation matrix for input properties array
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.price' => 'required|numeric|min:-100000', // Allows negative tracking offsets if needed
             'attributes.*.duration' => 'required|integer|min:-1440',
         ]);
+
+        $company = Company::find($validated['company_id']);
+
         if($request->hasFile('image')) {
             $path = $request->file('image')->store('service_images', 'public');
             $validated['image'] = $path;
@@ -166,7 +164,7 @@ class ServiceController extends Controller
 
         // Wrap execution steps within a database transaction loop to guarantee integrity
         $service = DB::transaction(function () use ($validated, $company) {
-            
+
             // Create base service parameters
             $service = $company->services()->create($validated);
 
@@ -195,13 +193,14 @@ class ServiceController extends Controller
                 'price_after_discount'  =>0,
                 'details_ar' => ['الوصف الأساسي للخدمة'],
                 'details_en' => ['Basic service description'],
-                'minimum_workers' => 2
+                'minimum_workers' => 2,
+                'is_open_package' => true,
             ]
         );
 
         return $this->successResponse(
-            $service->load('attributes'), 
-            'Service framework profile with linked configuration items deployed', 
+            $service->load('attributes'),
+            'Service framework profile with linked configuration items deployed',
             211
         );
     }
@@ -225,7 +224,7 @@ class ServiceController extends Controller
             'maximum_price' => 'sometimes|numeric|gte:minimum_price',
             'discount' => 'nullable|numeric|min:0|lte:maximum_price',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
-            
+
             'attributes' => 'nullable|array',
             'attributes.*.id' => 'required|exists:attributes,id',
             'attributes.*.price' => 'required|numeric',
@@ -237,7 +236,7 @@ class ServiceController extends Controller
         }
 
         DB::transaction(function () use ($validated, $service) {
-            
+
             // Perform target updates on core model attributes
             $service->update($validated);
             $packages = $service->packages;
@@ -260,7 +259,7 @@ class ServiceController extends Controller
         });
 
         return $this->successResponse(
-            $service->load('attributes'), 
+            $service->load('attributes'),
             'Service schema architecture mapping parameters updated'
         );
     }
@@ -278,7 +277,7 @@ class ServiceController extends Controller
 
         return $this->successResponse([], 'Service permanently scrubbed from inventory matrices');
     }
-    
+
     /**
      * Update service attributes exclusively, replacing the current list with new one.
      * Route: PATCH /api/services/{id}/attributes
@@ -329,7 +328,7 @@ class ServiceController extends Controller
         $service->requiredSkills()->syncWithoutDetaching($validated['skill_ids']);
 
         return $this->successResponse(
-            $service->load('requiredSkills'), 
+            $service->load('requiredSkills'),
             'Skills attached to the service successfully'
         );
     }
@@ -354,5 +353,5 @@ class ServiceController extends Controller
             'Skills removed from the service successfully'
         );
     }
- 
+
 }

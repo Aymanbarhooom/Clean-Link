@@ -33,16 +33,16 @@ class PaymentController extends Controller
             );
         }
 
-   
 
-        if ($order->payment_method !== 'electric') {
+
+        if ($order->payment_method !== 'card') {
             return $this->errorResponse(
                 'This order does not use electronic payment',
                 422
             );
         }
 
-    
+
 
         if ($order->payment_status !== 'pending') {
             return $this->errorResponse(
@@ -59,14 +59,14 @@ class PaymentController extends Controller
             );
         }
 
-        
+
 
         try {
             $stripe = new StripeClient(
                 config('services.stripe.secret')
             );
 
-            
+
 
             $amount = (int) round($order->total_price * 100);
 
@@ -77,7 +77,7 @@ class PaymentController extends Controller
                 );
             }
 
-           
+
             $paymentIntent = $stripe->paymentIntents->create([
                 'amount' => $amount,
                 'currency' => 'usd',
@@ -91,13 +91,13 @@ class PaymentController extends Controller
                 ],
             ]);
 
-           
+
 
             $order->update([
                 'stripe_payment_intent_id' => $paymentIntent->id,
             ]);
 
-            
+
 
             return $this->successResponse(
                 [
@@ -131,11 +131,11 @@ class PaymentController extends Controller
     // SECTION 1: CLIENT APIs
     // ==========================================
 
-    
+
     public function clientPayments(Request $request): JsonResponse
     {
         $user = auth()->user();
-        
+
         $query = Payment::where('user_id', $user->id);
 
         if ($request->filled('status')) {
@@ -152,7 +152,7 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Client payments retrieved successfully', 200);
     }
 
-    
+
     public function clientShowPayment($id): JsonResponse
     {
         $user = auth()->user();
@@ -184,7 +184,7 @@ class PaymentController extends Controller
             ],
             'total_price' => (float) $order->total_price,
             'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
+            'payment_method' => $order->payment_method === 'card' ? 'card' : 'cash',
             'payment_status' => $order->payment_status,
             'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
             'paid_at' => $order->updated_at->toIso8601String(),
@@ -235,7 +235,7 @@ class PaymentController extends Controller
             ], 'Company dashboard retrieved successfully', 200);
     }
 
-    
+
     public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
     {
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
@@ -260,8 +260,8 @@ class PaymentController extends Controller
         $grossRevenue = (float) $query->sum('total_price');
         $totalPayments = $query->count();
 
-        $cashQuery = (clone $query)->where('payment_method', 'manual');
-        $electricQuery = (clone $query)->where('payment_method', 'electric');
+        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $electricQuery = (clone $query)->where('payment_method', 'card');
 
         return $this->successResponse([
             'gross_revenue' => $grossRevenue,
@@ -280,7 +280,7 @@ class PaymentController extends Controller
         ], 'Company payments summary retrieved successfully', 200);
     }
 
-    
+
     public function companyPaymentsSearch(Request $request, Company $company): JsonResponse
     {
         $query = Order::with(['client', 'package.service'])
@@ -288,7 +288,7 @@ class PaymentController extends Controller
 
         if ($request->filled('status')) {
             $query->where('payment_status', $request->status);
-        } 
+        }
 
         if ($request->filled('payment_method')) {
             $query->where('payment_method', $request->payment_method);
@@ -312,7 +312,7 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Company payments search retrieved successfully', 200);
     }
 
-   
+
     public function companyShowPayment(Company $company, $paymentId): JsonResponse
     {
         $order = Order::with(['client', 'package.service'])
@@ -344,7 +344,7 @@ class PaymentController extends Controller
             ],
             'total_price' => (float) $order->total_price,
             'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
+            'payment_method' => $order->payment_method === 'card' ? 'card' : 'cash',
             'payment_status' => $order->payment_status,
             'system_share' => (float) $order->admin_share,
             'company_share' => (float) $order->company_share,
@@ -379,15 +379,15 @@ class PaymentController extends Controller
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'company_profit' => (float) $paidOrders->sum('company_share'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
             ];
         });
 
         return $this->successResponse($services, 'Company services statistics retrieved successfully', 200);
     }
 
-    
+
     public function companyRevenueChart(Request $request, Company $company): JsonResponse
     {
         $groupByParam = $request->get('group_by', $request->get('period', 'month'));
@@ -433,7 +433,7 @@ class PaymentController extends Controller
     // SECTION 3: ADMIN APIs
     // ==========================================
 
-    
+
     public function adminDashboard(): JsonResponse
     {
         $paidOrders = Order::whereIn('payment_status', ['captured', 'held']);
@@ -466,7 +466,7 @@ class PaymentController extends Controller
             ], 'Admin dashboard retrieved successfully', 200);
     }
 
-    
+
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
         $query = Order::whereIn('payment_status', ['captured', 'held']);
@@ -498,8 +498,8 @@ class PaymentController extends Controller
         $grossRevenue = (float) $query->sum('total_price');
         $totalPayments = $query->count();
 
-        $cashQuery = (clone $query)->where('payment_method', 'manual');
-        $electricQuery = (clone $query)->where('payment_method', 'electric');
+        $cashQuery = (clone $query)->where('payment_method', 'cash');
+        $electricQuery = (clone $query)->where('payment_method', 'card');
 
         return $this->successResponse([
             'gross_revenue' => $grossRevenue,
@@ -518,7 +518,7 @@ class PaymentController extends Controller
         ], 'Admin payments analytics retrieved successfully', 200);
     }
 
-    
+
     public function adminRevenueChart(Request $request): JsonResponse
     {
         $groupByParam = $request->get('group_by', 'month');
@@ -567,7 +567,7 @@ class PaymentController extends Controller
         return $this->successResponse($chartData, 'Admin revenue chart retrieved successfully', 200);
     }
 
-    
+
     public function adminPaymentsSearch(Request $request): JsonResponse
     {
         $query = Order::with(['client', 'package.service.company.region']);
@@ -606,7 +606,7 @@ class PaymentController extends Controller
         return $this->successResponse($orders, 'Admin payments search retrieved successfully', 200);
     }
 
-    
+
     public function adminCompaniesStats(Request $request): JsonResponse
 {
     $companiesQuery = Company::query();
@@ -649,8 +649,8 @@ class PaymentController extends Controller
             'orders_count' => $ordersQuery->count(),
             'payments_count' => $paidOrders->count(),
             'gross_revenue' => (float) $paidOrders->sum('total_price'),
-            'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
-            'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+            'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+            'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
             'system_profit' => (float) $paidOrders->sum('admin_share'),
             'company_profit' => (float) $paidOrders->sum('company_share'),
         ];
@@ -659,8 +659,8 @@ class PaymentController extends Controller
     return $this->successResponse($result, 'Admin companies statistics retrieved successfully', 200);
 }
 
-   
-     
+
+
     public function adminRegionsStats(Request $request): JsonResponse
     {
         $regions = Region::all()->map(function ($region) use ($request) {
@@ -687,8 +687,8 @@ class PaymentController extends Controller
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];
@@ -697,7 +697,7 @@ class PaymentController extends Controller
         return $this->successResponse($regions, 'Admin regions statistics retrieved successfully', 200);
     }
 
-   
+
     public function adminServicesStats(Request $request): JsonResponse
     {
         $services = Service::all()->map(function ($service) use ($request) {
@@ -731,8 +731,8 @@ class PaymentController extends Controller
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
-                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'manual')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'electric')->sum('total_price'),
+                'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
+                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];
@@ -741,7 +741,7 @@ class PaymentController extends Controller
         return $this->successResponse($services, 'Admin services statistics retrieved successfully', 200);
     }
 
-    
+
     public function adminShowPayment($id): JsonResponse
     {
         $order = Order::with(['client', 'package.service.company.region'])->find($id);
@@ -773,7 +773,7 @@ class PaymentController extends Controller
                 'name' => $service->name ?? ''
             ],
             'amount' => (float) $order->total_price,
-            'payment_method' => $order->payment_method === 'electric' ? 'electric' : 'manual',
+            'payment_method' => $order->payment_method === 'card' ? 'card' : 'cash',
             'payment_status' => $order->payment_status,
             'system_profit' => (float) $order->admin_share,
             'company_profit' => (float) $order->company_share,

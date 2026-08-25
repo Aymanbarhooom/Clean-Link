@@ -20,8 +20,8 @@ class WorkgroupController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    
-    public function index(Request $request): JsonResponse
+
+    public function index(Company $company): JsonResponse
     {
         $user = auth()->user();
 
@@ -31,26 +31,16 @@ class WorkgroupController extends Controller
 
         $query = Workgroup::with(['leader', 'workers.profile', 'workers.workerProfile.skills']);
 
-         if ($request->filled('company_id')) {
-            $company = Company::find($request->company_id);
-
-            if (!$company || !$user->canManageCompany($company)) {
-                return $this->errorResponse('You do not have permission to view orders for this company', 403);
-            }
-
-            $query->where('company_id', $company->id);
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
         }
 
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-            $query->where('company_id', $company->id);
-        }
+        $query->where('company_id', $company->id);
 
         return $this->successResponse($query->get(), 'Workforce groups successfully synchronized');
     }
 
-    public function activeWorkGroups(): JsonResponse
+    public function activeWorkGroups(Company $company): JsonResponse
     {
         $user = auth()->user();
 
@@ -63,11 +53,11 @@ class WorkgroupController extends Controller
                 $taskQuery->whereIn('status', ['pending', 'on_way', 'handling']);
             });
 
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-            $query->where('company_id', $company->id);
+        if (!$user->isAdmin() && !$user->canManageCompany($company)) {
+            return $this->errorResponse('You do not have permission to view orders for this company', 403);
         }
+
+        $query->where('company_id', $company->id);
 
         return $this->successResponse($query->get(), 'Active workgroups successfully retrieved');
     }
@@ -75,26 +65,18 @@ class WorkgroupController extends Controller
     public function show(Workgroup $workgroup): JsonResponse
     {
         $user = auth()->user();
-
-        if (!$user->isCompanyManager() && !$user->isAdmin()) {
-            return $this->errorResponse('Access restricted to organizational managers', 403);
-        }
-
-        if ($user->isCompanyManager()) {
-            $company = $user->managedCompanies()->first();
-            if (!$company) return $this->successResponse([], 'No business profile attached');
-
-            if ($workgroup->company_id !== $company->id) {
-                return $this->errorResponse('Unauthorized access to this workgroup', 403);
-            }
-        }
+        $company = $workgroup->company;
+        if (($user->isCompanyManager() && $company->manager_id === $user->id) || !$user->isAdmin()) {
 
         $workgroup->load(['leader', 'workers.profile', 'workers.workerProfile.skills', 'tasks.order.package.service']);
 
         return $this->successResponse($workgroup, 'Workgroup details retrieved successfully');
+        }
+        return $this->errorResponse('Access restricted to organizational managers', 403);
+
     }
 
-   
+
     public function store(Request $request): JsonResponse
     {
         $user = auth()->user();
@@ -111,7 +93,7 @@ class WorkgroupController extends Controller
             'worker_ids.*' => 'required|exists:users,id',
         ]);
 
-        
+
         $allStaff = array_unique(array_merge([$validated['leader_id']], $validated['worker_ids']));
 
         $alreadyAssigned = User::whereIn('id', $allStaff)
@@ -128,7 +110,7 @@ class WorkgroupController extends Controller
         }
 
         $workgroup = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $allStaff) {
-            
+
             $workgroup = Workgroup::create([
                 'company_id' => $validated['company_id'],
                 'name' => $validated['name'],
@@ -142,8 +124,8 @@ class WorkgroupController extends Controller
         });
 
         return $this->successResponse(
-            $workgroup->load(['leader', 'workers.profile']), 
-            'Crew workgroup established successfully', 
+            $workgroup->load(['leader', 'workers.profile']),
+            'Crew workgroup established successfully',
             211
         );
     }
@@ -167,19 +149,19 @@ class WorkgroupController extends Controller
             if (isset($validated['worker_ids']) || isset($validated['leader_id'])) {
                 $leaderId = $validated['leader_id'] ?? $workgroup->leader_id;
                 $inputWorkers = $validated['worker_ids'] ?? $workgroup->workers()->pluck('users.id')->toArray();
-                
+
                 $allStaff = array_unique(array_merge([$leaderId], $inputWorkers));
                 $workgroup->workers()->sync($allStaff);
             }
         });
 
         return $this->successResponse(
-            $workgroup->load(['leader', 'workers.profile']), 
+            $workgroup->load(['leader', 'workers.profile']),
             'Workgroup crew re-balanced successfully'
         );
     }
 
-   
+
     public function destroy(Workgroup $workgroup): JsonResponse
     {
         if (auth()->user()->id !== $workgroup->company->manager_id) {
