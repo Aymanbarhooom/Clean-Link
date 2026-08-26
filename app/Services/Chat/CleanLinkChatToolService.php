@@ -175,6 +175,12 @@ class CleanLinkChatToolService
     {
         $items = $user->locations()->get()->map(fn ($x) => ['id' => $x->id, 'name' => $x->name, 'address' => $x->address,
             'latitude' => $x->latitude, 'longitude' => $x->longitude])->all();
+        if (count($items) === 1) {
+            return [
+                'locations' => $items,
+                'auto_selected_location' => $items[0],
+            ];
+        }
         return ['locations' => $items, '_action' => ['type' => 'select_location', 'title' => 'Choose location',
             'options' => collect($items)->map(fn ($x) => ['label' => $x['name'], 'label_ar' => $x['name'], 'value' => $x['id'],
                 'message' => 'Use '.$x['name'].' location', 'message_ar' => 'استخدم موقع '.$x['name']])->all()]];
@@ -208,8 +214,8 @@ class CleanLinkChatToolService
 
     private function paymentMethods(): array
     {
-        $items = [['value' => 'manual', 'label' => 'Cash', 'label_ar' => 'نقداً', 'message' => 'Pay with cash', 'message_ar' => 'الدفع نقداً'],
-            ['value' => 'electric', 'label' => 'Card', 'label_ar' => 'بطاقة', 'message' => 'Pay with card', 'message_ar' => 'الدفع بالبطاقة']];
+        $items = [['value' => 'cash', 'label' => 'Cash', 'label_ar' => 'نقداً', 'message' => 'Pay with cash', 'message_ar' => 'الدفع نقداً'],
+            ['value' => 'card', 'label' => 'Card', 'label_ar' => 'بطاقة', 'message' => 'Pay with card', 'message_ar' => 'الدفع بالبطاقة']];
         return ['payment_methods' => $items, 'card_note' => 'Card orders are cancelled if payment is not confirmed within 10 minutes.',
             '_action' => ['type' => 'select_payment_method', 'title' => 'Payment method',
                 'electronic_payment_warning' => true, 'options' => $items]];

@@ -26,7 +26,7 @@ class SendChatMessageRequest extends FormRequest
             'conversation_id' => [
                 'nullable',
                 'integer',
-                'exists:chat_conversations,id',
+                'min:1',
             ],
         ];
     }

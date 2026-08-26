@@ -23,6 +23,7 @@ class OrderPolicy
             return true;
         }
 
+        return false;
     }
 
     public function view(User $user, Order $order): bool

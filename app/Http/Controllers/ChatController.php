@@ -71,6 +71,7 @@ class ChatController extends Controller
     {
         $user = $request->user();
         $conversation = null;
+        $createdConversation = false;
         if ($request->filled('conversation_id')) {
             $conversation = ChatConversation::query()->where(
                 'id',
@@ -88,6 +89,7 @@ class ChatController extends Controller
                 'user_id' => $user->id,
                 'title' => $this->createTitle($request->string('message')->toString()),
             ]);
+            $createdConversation = true;
         }
 
         try {
@@ -153,6 +155,7 @@ class ChatController extends Controller
                 }
             );
         } catch (AllGeminiModelsExhaustedException $exception) {
+            $this->deleteFailedEmptyConversation($conversation, $createdConversation);
             report($exception);
 
             return response()->json([
@@ -160,6 +163,7 @@ class ChatController extends Controller
                 'code' => 'CHAT_QUOTA_EXCEEDED',
             ], 429);
         } catch (GeminiConnectionException $exception) {
+            $this->deleteFailedEmptyConversation($conversation, $createdConversation);
             report($exception);
 
             return response()->json([
@@ -167,6 +171,7 @@ class ChatController extends Controller
                 'code' => 'CHAT_CONNECTION_ERROR',
             ], 503);
         } catch (GeminiTemporaryUnavailableException $exception) {
+            $this->deleteFailedEmptyConversation($conversation, $createdConversation);
             report($exception);
 
             return response()->json([
@@ -174,6 +179,7 @@ class ChatController extends Controller
                 'code' => 'CHAT_TEMPORARILY_UNAVAILABLE',
             ], 503);
         } catch (GeminiRequestException $exception) {
+            $this->deleteFailedEmptyConversation($conversation, $createdConversation);
             report($exception);
 
             return response()->json([
@@ -181,6 +187,7 @@ class ChatController extends Controller
                 'code' => 'CHAT_ERROR',
             ], 500);
         } catch (Throwable $exception) {
+            $this->deleteFailedEmptyConversation($conversation, $createdConversation);
             report($exception);
 
 
@@ -232,5 +239,12 @@ class ChatController extends Controller
             0,
             80
         );
+    }
+
+    private function deleteFailedEmptyConversation(?ChatConversation $conversation, bool $createdConversation): void
+    {
+        if ($createdConversation && $conversation && !$conversation->messages()->exists()) {
+            $conversation->delete();
+        }
     }
 }

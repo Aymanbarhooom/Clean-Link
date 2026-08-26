@@ -17,8 +17,8 @@ class Kernel extends ConsoleKernel
             ->withoutOverlapping()  // يمنع التشغيل المتزامن لمهمات طويلة
             ->runInBackground();
 
-        // Check electric pending payments every minute
-        $schedule->command('orders:cancel-electric-pending')
+        // Check pending card payments every minute.
+        $schedule->command('orders:cancel-card-pending')
             ->everyMinute()
             ->withoutOverlapping()
             ->runInBackground();

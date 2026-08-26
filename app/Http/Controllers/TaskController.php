@@ -174,6 +174,10 @@ class TaskController extends Controller
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
             $order->update(['payment_status' => 'captured']);
+            $order->payments()->latest()->update([
+                'payment_status' => 'captured',
+                'paid_at' => now(),
+            ]);
 
             foreach ($workers as $worker) {
                 $worker->workerProfile->status = 'available';

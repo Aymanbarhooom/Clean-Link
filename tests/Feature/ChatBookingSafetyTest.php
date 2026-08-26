@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\Chat\ChatBookingService;
 use App\Services\Chat\CleanLinkChatTools;
 use App\Services\Chat\CleanLinkChatInstructions;
+use App\Services\Chat\CleanLinkChatToolService;
 use App\Models\AttributeModel;
 use App\Models\ChatBookingDraft;
 use App\Models\Package;
@@ -62,7 +63,25 @@ class ChatBookingSafetyTest extends TestCase
         ], $missing);
     }
 
-    public function test_open_package_state_requires_every_real_attribute(): void
+    public function test_chat_exposes_only_canonical_cash_and_card_payment_values(): void
+    {
+        $reflection = new ReflectionClass(CleanLinkChatToolService::class);
+        $service = $reflection->newInstanceWithoutConstructor();
+        $method = $reflection->getMethod('paymentMethods');
+
+        $result = $method->invoke($service);
+
+        $this->assertSame(
+            ['cash', 'card'],
+            array_column($result['payment_methods'], 'value')
+        );
+        $this->assertSame(
+            ['cash', 'card'],
+            array_column($result['_action']['options'], 'value')
+        );
+    }
+
+    public function test_open_package_state_defaults_unselected_attributes_to_zero(): void
     {
         $first = new AttributeModel(['name_en' => 'Rooms']);
         $first->id = 11;
@@ -78,8 +97,12 @@ class ChatBookingSafetyTest extends TestCase
         $method = $reflection->getMethod('openAttributeState');
         $state = $method->invoke($bookingService, $package, [['id' => 11, 'qty' => 2]]);
 
-        $this->assertSame([12], $state['missing']);
-        $this->assertSame(['Bathrooms'], $state['missing_names']);
+        $this->assertSame([
+            ['id' => 11, 'qty' => 2],
+            ['id' => 12, 'qty' => 0],
+        ], $state['attributes']);
+        $this->assertSame([], $state['missing']);
+        $this->assertSame([], $state['missing_names']);
         $this->assertSame([], $state['invalid']);
     }
 
@@ -88,7 +111,8 @@ class ChatBookingSafetyTest extends TestCase
         $instructions = CleanLinkChatInstructions::text();
 
         $this->assertStringContainsString('Call search_companies with an empty query', $instructions);
-        $this->assertStringContainsString('All Open Package attributes are mandatory', $instructions);
+        $this->assertStringContainsString('Attributes are optional', $instructions);
+        $this->assertStringContainsString('Never ask the client to configure all attributes', $instructions);
         $this->assertStringContainsString('payment must be confirmed within 10 minutes', $instructions);
         $this->assertStringContainsString('company, service, package, saved location, date, time, payment method', $instructions);
     }

@@ -30,5 +30,7 @@ class CleanLinkChatInstructionsTest extends TestCase
         $this->assertStringContainsString('Do not use Markdown headings', $instructions);
         $this->assertStringContainsString('do not use tables or nested bullet lists', $instructions);
         $this->assertStringContainsString('Arabic responses must follow the same clean plain-text rules', $instructions);
+        $this->assertStringContainsString('If exactly one saved location is returned, use it automatically', $instructions);
+        $this->assertStringContainsString('Never show a redundant location choice', $instructions);
     }
 }

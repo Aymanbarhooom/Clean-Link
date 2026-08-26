@@ -196,11 +196,14 @@ class AuthController extends Controller
             'email' => $validated['email'],
         ]);
 
-        $user->profile()->update([
+        $profileData = [
             'phone' => $validated['phone'] ?? null,
             'address' => $validated['address'] ?? null,
-            'image' => $validated['image'] ?? null,
-        ]);
+        ];
+        if (array_key_exists('image', $validated)) {
+            $profileData['image'] = $validated['image'];
+        }
+        $user->profile()->update($profileData);
 
         return $this->successResponse(
             $user->load('profile'),

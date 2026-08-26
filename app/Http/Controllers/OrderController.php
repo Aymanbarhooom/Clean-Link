@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\BookingConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Http\Resources\OrderLocationResource;
@@ -10,13 +11,11 @@ use App\Models\Package;
 use App\Models\Order;
 use App\Models\Service;
 use App\Models\User;
-use App\Models\Workgroup;
-use App\Services\FirebaseNotificationService;
+use App\Services\Booking\AtomicBookingService;
 use App\Services\GoogleRoutesService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -172,9 +171,9 @@ class OrderController extends Controller
         }
 
         $validated = $request->validate([
-            'attributes' => 'nullable|array',
+            'attributes' => 'present|array',
             'attributes.*.id' => 'required|exists:attributes,id',
-            'attributes.*.qty' => 'required|integer|min:1',
+            'attributes.*.qty' => 'required|integer|min:0',
         ]);
 
         $service = $package->service;
@@ -198,9 +197,9 @@ class OrderController extends Controller
         $validated = $request->validate([
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'attributes' => 'nullable|array',
+            'attributes' => 'present|array',
             'attributes.*.id' => 'required|exists:attributes,id',
-            'attributes.*.qty' => 'required|integer|min:1',
+            'attributes.*.qty' => 'required|integer|min:0',
         ]);
 
         $service = $package->service;
@@ -353,9 +352,9 @@ class OrderController extends Controller
             'longitude' => 'required|numeric',
             'start_time' => 'required|date|after:now',
             'note' => 'nullable|string|max:1000',
-            'attributes' => 'nullable|array',
+            'attributes' => 'present|array',
             'attributes.*.id' => 'required|exists:attributes,id',
-            'attributes.*.qty' => 'required|integer|min:1',
+            'attributes.*.qty' => 'required|integer|min:0',
 
             'payment_method' => 'required|in:card,cash',
         ]);
@@ -400,176 +399,32 @@ class OrderController extends Controller
             ];
         }
 
-        $order = DB::transaction(function () use ($validated, $package, $startTime, $effectiveEndTime, $totalDuration, $travelBufferMinutes, $totals, $pivotPayload) {
-            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
-            $order = Order::create([
-                'client_id' => auth()->id(),
-                'package_id' => $package->id,
-                'location' => $validated['location'],
-                'latitude' => $validated['latitude'],
-                'longitude' => $validated['longitude'],
-                'note' => $validated['note'] ?? null,
-                'start_time' => $startTime,
-                'end_time' => $effectiveEndTime,
-                'duration' => $totalDuration,
-                'travel_buffer_minutes' => $travelBufferMinutes,
-                'status' => 'pending',
-                'total_price' => $totals['total_price'],
-
-                'payment_method' => $validated['payment_method'],
-                'payment_status' => $validated['payment_method'] === 'card'
-                    ? 'pending'
-                    : 'held',
-                'is_done_with_admin' => $validated['payment_method'] === 'card',
-                'is_company_paid' => $validated['payment_method'] === 'cash',
-            ]);
-
-            $order->payments()->create([
-                'user_id' => auth()->id(),
-                'amount' => $order->total_price,
-                'currency' => 'usd',
-                'payment_method' => $validated['payment_method'],
-                'payment_status' => $paymentStatus,
-                'paid_at' => $validated['payment_method'] === 'cash' ? now() : null,
-            ]);
-
-            $order->calculateAndSetPaymentShares();
-
-            if (!empty($pivotPayload)) {
-                $order->attributes()->attach($pivotPayload);
-            }
-
-            return $order;
-        });
-
-        $order->load(['package.service', 'attributes']);
-
         try {
-            $service = $package->service;
-            $company = $service->company;
-            $requiredSkillIds = $service->requiredSkills()->pluck('skills.id')->toArray();
-            $minimumWorkers = (int) ($totals['duration'] / 30 ?? 2);
+            $booking = app(AtomicBookingService::class)->book(
+                auth()->user(),
+                $package,
+                $validated,
+                $startTime,
+                $totalDuration,
+                $travelBufferMinutes,
+                $oneWayMinutes,
+                $totals['total_price'],
+                max(1, (int) ceil($totals['duration'] / 30)),
+                $pivotPayload,
+            );
 
-            $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
-                $q->where('company_id', $company->id);
-            })
-                ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
-                    $q->whereIn('skills.id', $requiredSkillIds);
-                })
-                ->with(['workerProfile.skills', 'profile'])
-                ->get();
-
-            if ($eligibleWorkers->count() >= $minimumWorkers) {
-                    $this->lockEligibleWorkers($eligibleWorkers);
-                    $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
-                        $q->where('company_id', $company->id);
-                    })
-                        ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
-                            $q->whereIn('skills.id', $requiredSkillIds);
-                        })
-                        ->with(['workerProfile.skills', 'profile'])
-                        ->get();
-
-                $combinations = $this->combinations($eligibleWorkers->values()->all(), $minimumWorkers);
-                $found = null;
-                foreach ($combinations as $combo) {
-                    $combined = collect($combo)
-                        ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
-                        ->flatten()
-                        ->unique()
-                        ->toArray();
-
-                    if (!empty(array_diff($requiredSkillIds, $combined))) {
-                        continue;
-                    }
-
-                    $conflict = false;
-                    foreach ($combo as $worker) {
-                        if (!$this->isWorkerAvailable($worker, $startTime, $effectiveEndTime)) {
-                            $conflict = true;
-                            break;
-                        }
-                    }
-
-                    if (!$conflict) {
-                        $found = $combo;
-                        break;
-                    }
-                }
-
-                if ($found) {
-                    $leader = collect($found)->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)->first();
-                    $order->setRelation('leader', $leader);
-
-                    $workgroup = Workgroup::create([
-                        'company_id' => $company->id,
-                        'name' => 'Auto WG #' . $order->id . ' ' . now()->format('YmdHis'),
-                        'leader_id' => $leader->id,
-                    ]);
-
-                    $workerIds = collect($found)->pluck('id')->toArray();
-                    $workgroup->workers()->attach($workerIds);
-
-                    DB::transaction(function () use ($order, $workgroup) {
-                        $order->tasks()->create([
-                            'workgroup_id' => $workgroup->id,
-                            'status' => 'pending'
-                        ]);
-                        $order->update(['status' => 'assigned_to_worker']);
-                    });
-
-                    $newTaskNotifications = [
-                        'ar' => [
-                            'title' => 'مهمة جديدة تم تعيينها',
-                            'body' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                            'status' => 'قيد المعالجة',
-                        ],
-                        'en' => [
-                            'title' => 'New Task Assigned',
-                            'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                            'status' => 'in_process',
-                        ]
-                    ];
-
-                    foreach ($found as $worker) {
-                        $notification = $worker->notifications()->create([
-                            'title_ar' => 'تم تعيين مهمة جديدة',
-                            'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                            'title_en' => 'New Task Assigned',
-                            'body_en' => "You have been assigned a new task for Order #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                            'data' => [
-                                'type' => 'new_task_assigned',
-                                'order_id' => $order->id,
-                                'status' => 'assigned_to_worker',
-                            ],
-                        ]);
-
-                        foreach ($worker->fcmTokens as $token) {
-                            $notificationTitle = $newTaskNotifications[$token->lang]['title'] ?? $newTaskNotifications['en']['title'];
-                            $notificationBody = $newTaskNotifications[$token->lang]['body'] ?? $newTaskNotifications['en']['body'];
-                            app(FirebaseNotificationService::class)->sendPushNotification(
-                                $token->token,
-                                $notificationTitle,
-                                $notificationBody,
-                                [
-                                    'notification_id' => $notification->id,
-                                    'type' => 'new_task_assigned',
-                                    'order_id' => $order->id,
-                                    'status' => 'assigned_to_worker',
-                                ]
-                            );
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
+            return $this->successResponse(
+                new OrderResource($booking['order']->load(['package.service', 'attributes'])),
+                'Open Package booking submitted and assigned successfully',
+                211,
+            );
+        } catch (BookingConflictException $exception) {
+            return response()->json([
+                'status' => 409,
+                'code' => 'BOOKING_CONFLICT',
+                'message' => $exception->getMessage(),
+            ], 409);
         }
-
-        return $this->successResponse(
-            new OrderResource($order),
-            'Open Package booking submitted and placed under review successfully',
-            211
-        );
     }
 
     public function store(Request $request, GoogleRoutesService $routesService): JsonResponse
@@ -590,6 +445,9 @@ class OrderController extends Controller
         ]);
 
         $package = Package::with('service.company')->find($validated['package_id']);
+        if ($package->is_open_package) {
+            return $this->errorResponse('Use the Open Package booking endpoint for this package', 422);
+        }
         $service = $package->service;
         $company = $service->company;
 
@@ -636,233 +494,32 @@ class OrderController extends Controller
 
         $totalDuration += $travelBufferMinutes;
 
-
-        $order = DB::transaction(function () use (
-            $effectiveEndTime,
-            $travelBufferMinutes,
-            $validated,
-            $package,
-            $service,
-            $startTime,
-            $endTime,
-            $totalDuration,
-            $attributeTotals,
-            $pivotPayload
-        ) {
-            $paymentStatus = $validated['payment_method'] === 'card' ? 'pending' : 'held';
-            $order = Order::create([
-                'client_id' => auth()->id(),
-                'package_id' => $package->id,
-
-                'location' => $validated['location'],
-                'latitude' => $validated['latitude'],
-                'longitude' => $validated['longitude'],
-                'note' => $validated['note'] ?? null,
-
-                'start_time' => $startTime,
-                'end_time' => $effectiveEndTime,
-                'duration' => $totalDuration,
-                'travel_buffer_minutes' => $travelBufferMinutes,
-
-                'status' => 'pending',
-
-                'total_price' => $attributeTotals['total_price'],
-
-                'payment_method' => $validated['payment_method'],
-
-                'payment_status' => $validated['payment_method'] === 'card'
-                    ? 'pending'
-                    : 'held',
-
-                'is_done_with_admin' => $validated['payment_method'] === 'card',
-                'is_company_paid' => $validated['payment_method'] === 'cash',
-            ]);
-
-            $order->payments()->create([
-                'user_id' => auth()->id(),
-                'amount' => $order->total_price,
-                'currency' => 'usd',
-                'payment_method' => $validated['payment_method'],
-                'payment_status' => $paymentStatus,
-                'paid_at' => $validated['payment_method'] === 'cash' ? now() : null,
-            ]);
-
-
-
-            $order->calculateAndSetPaymentShares();
-
-            if (!empty($pivotPayload)) {
-                $order->attributes()->attach($pivotPayload);
-            }
-
-            return $order;
-        });
-
-        $order->load(['package.service', 'attributes']);
-
         try {
-            $service = $package->service;
-            $company = $service->company;
+            $booking = app(AtomicBookingService::class)->book(
+                auth()->user(),
+                $package,
+                $validated,
+                $startTime,
+                $baseDuration,
+                $travelBufferMinutes,
+                $oneWayMinutes,
+                $attributeTotals['total_price'],
+                max(1, (int) ($package->minimum_workers ?? 1)),
+            );
 
-            $requiredSkillIds = $service->requiredSkills()
-                ->pluck('skills.id')
-                ->toArray();
-
-            $minimumWorkers = (int) ($package->minimum_workers ?? 1);
-
-            $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
-                $q->where('company_id', $company->id);
-            })
-                ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
-                    $q->whereIn('skills.id', $requiredSkillIds);
-                })
-                ->with(['workerProfile.skills', 'profile'])
-                ->get();
-
-            if ($eligibleWorkers->count() >= $minimumWorkers) {
-                $this->lockEligibleWorkers($eligibleWorkers);
-                $eligibleWorkers = User::whereHas('workerProfile', function ($q) use ($company) {
-                    $q->where('company_id', $company->id);
-                })
-                    ->whereHas('workerProfile.skills', function ($q) use ($requiredSkillIds) {
-                        $q->whereIn('skills.id', $requiredSkillIds);
-                    })
-                    ->with(['workerProfile.skills', 'profile'])
-                    ->get();
-
-                $combinations = $this->combinations(
-                    $eligibleWorkers->values()->all(),
-                    $minimumWorkers
-                );
-
-                $found = null;
-
-                foreach ($combinations as $combo) {
-
-                    $combined = collect($combo)
-                        ->map(fn($u) => $u->workerProfile->skills->pluck('id'))
-                        ->flatten()
-                        ->unique()
-                        ->toArray();
-
-                    if (!empty(array_diff($requiredSkillIds, $combined))) {
-                        continue;
-                    }
-
-                    $conflict = false;
-
-                    foreach ($combo as $worker) {
-
-                        if (!$this->isWorkerAvailable(
-                            $worker,
-                            $startTime,
-                            $effectiveEndTime
-                        )) {
-                            $conflict = true;
-                            break;
-                        }
-                    }
-
-                    if (!$conflict) {
-                        $found = $combo;
-                        break;
-                    }
-                }
-
-                if ($found) {
-
-                    $leader = collect($found)
-                        ->sortByDesc(fn($u) => $u->workerProfile->rating ?? 0)
-                        ->first();
-
-                    $order->setRelation('leader', $leader);
-
-                    $workgroup = Workgroup::create([
-                        'company_id' => $company->id,
-                        'name' => 'Auto WG #' . $order->id . ' ' . now()->format('YmdHis'),
-                        'leader_id' => $leader->id,
-                    ]);
-
-                    $workerIds = collect($found)->pluck('id')->toArray();
-
-                    $workgroup->workers()->attach($workerIds);
-
-                    DB::transaction(function () use ($order, $workgroup) {
-
-                        $order->tasks()->create([
-                            'workgroup_id' => $workgroup->id,
-                            'status' => 'pending'
-                        ]);
-
-                        $order->update([
-                            'status' => 'assigned_to_worker'
-                        ]);
-                    });
-
-                    $newTaskNotifications = [
-                        'ar' => [
-                            'title' => 'مهمة جديدة تم تعيينها',
-                            'body' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                            'status' => 'قيد المعالجة',
-                        ],
-                        'en' => [
-                            'title' => 'New Task Assigned',
-                            'body' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                            'status' => 'in_process',
-                        ]
-                    ];
-
-                    foreach ($found as $worker) {
-
-                        $notification = $worker->notifications()->create([
-                            'title_ar' => 'تم تعيين مهمة جديدة',
-                            'body_ar' => "تم تعيين مهمة جديدة لك لطلب رقم #{$order->id}. يرجى التحقق من لوحة التحكم الخاصة بك لمزيد من التفاصيل.",
-                            'title_en' => 'New Task Assigned',
-                            'body_en' => "You have been assigned a new task for Order #{$order->id}. Please check your dashboard for details.",
-                            'data' => [
-                                'type' => 'new_task_assigned',
-                                'order_id' => $order->id,
-                                'status' => 'assigned_to_worker',
-                            ],
-                        ]);
-
-                        foreach ($worker->fcmTokens as $token) {
-
-                            $notificationTitle =
-                                $newTaskNotifications[$token->lang]['title']
-                                ?? $newTaskNotifications['en']['title'];
-
-                            $notificationBody =
-                                $newTaskNotifications[$token->lang]['body']
-                                ?? $newTaskNotifications['en']['body'];
-
-                            app(FirebaseNotificationService::class)
-                                ->sendPushNotification(
-                                    $token->token,
-                                    $notificationTitle,
-                                    $notificationBody,
-                                    [
-                                        'notification_id' => $notification->id,
-                                        'type' => 'new_task_assigned',
-                                        'order_id' => $order->id,
-                                        'status' => 'assigned_to_worker',
-                                    ]
-                                );
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Auto-assignment failed for order #' . $order->id . ': ' . $e->getMessage());
+            return $this->successResponse(
+                new OrderResource($booking['order']->load(['package.service', 'attributes'])),
+                'Booking submitted and assigned successfully',
+                211,
+            );
+        } catch (BookingConflictException $exception) {
+            return response()->json([
+                'status' => 409,
+                'code' => 'BOOKING_CONFLICT',
+                'message' => $exception->getMessage(),
+            ], 409);
         }
-
-        return $this->successResponse(
-            new OrderResource($order),
-            'Booking submitted and placed under review successfully',
-            211
-        );
     }
-
 
     public function cancel(Order $order): JsonResponse
     {
@@ -882,6 +539,9 @@ class OrderController extends Controller
                 if ($order->payment_status === 'held') {
                     $stripe->paymentIntents->cancel($order->stripe_payment_intent_id);
                     $order->update(['payment_status' => 'refunded']);
+                    $order->payments()->latest()->update([
+                        'payment_status' => 'refunded'
+                    ]);
                 } elseif (in_array($order->payment_status, ['captured'], true)) {
                     $stripe->refunds->create([
                         'payment_intent' => $order->stripe_payment_intent_id,
@@ -910,7 +570,7 @@ class OrderController extends Controller
 
         $validated = $request->validate([
             'status' => ['nullable', 'string', 'in:pending,assigned_to_worker,in_process,in_progress,completed,canceled'],
-            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,refunded'],
+            'payment_status' => ['nullable', 'string', 'in:pending,held,captured,refunded,failed'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => 'sometimes|integer|min:1',
             'company_id' => ['sometimes', 'integer', 'exists:companies,id'], // تعديل هنا لجعل company_id غير مطلوب
@@ -944,8 +604,7 @@ class OrderController extends Controller
 
         // إضافة شرط لتصفية الطلبات حسب حالة الدفع
         if (!empty($validated['payment_status'])) {
-            $normalizedPaymentStatus = $validated['payment_status'] === 'paid' ? 'captured' : $validated['payment_status'];
-            $query->where('payment_status', $normalizedPaymentStatus);
+            $query->where('payment_status', $validated['payment_status']);
         }
 
         // استرجاع الطلبات مع الترتيب والتقسيم
@@ -1066,17 +725,25 @@ class OrderController extends Controller
 
     private function buildServiceAttributeItems(Service $service, array $submittedAttributes): array
     {
-        if (empty($submittedAttributes)) {
-            return [];
-        }
-
         $loadedAttributes = $service->attributes()->get()->keyBy('id');
+
+        $submittedIds = collect($submittedAttributes)->pluck('id')->map(fn ($id) => (int) $id);
+        if (
+            $submittedIds->count() !== $submittedIds->unique()->count()
+            || $submittedIds->sort()->values()->all() !== $loadedAttributes->keys()->map(fn ($id) => (int) $id)->sort()->values()->all()
+        ) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'attributes' => ['Every service attribute must be submitted exactly once.'],
+            ]);
+        }
 
         $items = [];
         foreach ($submittedAttributes as $item) {
             $serviceAttribute = $loadedAttributes->get($item['id']);
             if (!$serviceAttribute) {
-                continue;
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'attributes' => ['An attribute does not belong to the selected service.'],
+                ]);
             }
 
             $items[] = [
@@ -1096,7 +763,7 @@ class OrderController extends Controller
         $runningTotalDuration = $baseDuration;
 
         foreach ($attributeInputs as $item) {
-            $qty = (int) ($item['qty'] ?? 1);
+            $qty = (int) ($item['qty'] ?? 0);
             $price = (float) ($item['price'] ?? 0.0);
             $duration = (int) ($item['duration'] ?? 0);
 
@@ -1128,27 +795,10 @@ class OrderController extends Controller
                 $q->where('users.id', $worker->id);
             })
             ->where('start_time', '<', $newEffectiveEnd)
-            ->whereRaw('DATE_ADD(end_time, INTERVAL travel_buffer_minutes MINUTE) > ?', [$newStart])
+            ->where('end_time', '>', $newStart)
             ->exists();
 
         return !$conflict;
     }
 
-    /**
-     * قفل العمال المؤهلين للتحقق من عدم التضارب
-     */
-    private function lockEligibleWorkers($eligibleWorkers): void
-    {
-        // استخراج IDs العمال المؤهلين
-        $workerIds = $eligibleWorkers->pluck('id')->toArray();
-
-        if (empty($workerIds)) {
-            return;
-        }
-
-        // 🔒 قفل العمال في قاعدة البيانات
-        User::whereIn('id', $workerIds)
-            ->lockForUpdate()
-            ->get();
-    }
 }

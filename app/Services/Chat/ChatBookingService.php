@@ -13,6 +13,7 @@ use App\Services\GoogleRoutesService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -80,8 +81,8 @@ class ChatBookingService
         if (array_key_exists('payment_method', $input)) {
             abort_unless($changes['start_time'] ?? $draft->start_time, 422, 'Select an available date and time before choosing payment.');
             $method = match (Str::lower(trim((string) $input['payment_method']))) {
-                'cash', 'manual' => 'manual',
-                'card', 'electronic', 'electric', 'stripe' => 'electric',
+                'cash', 'manual' => 'cash',
+                'card', 'electronic', 'electric', 'stripe' => 'card',
                 default => abort(422, 'Supported payment methods are cash and card.'),
             };
             $changes['payment_method'] = $method;
@@ -107,7 +108,7 @@ class ChatBookingService
             $submitted = collect($input['attributes'])->map(function ($item) use ($allowed) {
                 $id = (int) ($item['id'] ?? 0);
                 $qty = (int) ($item['qty'] ?? 0);
-                abort_unless($allowed->has($id) && $qty >= 1, 422, 'Invalid Open Package attribute.');
+                abort_unless($allowed->has($id) && $qty >= 0, 422, 'Invalid Open Package attribute.');
                 return ['id' => $id, 'qty' => $qty];
             })->unique('id')->keyBy('id');
             $attributes = collect($draft->open_package_attributes ?? [])->keyBy('id');
@@ -121,7 +122,10 @@ class ChatBookingService
             abort_unless($package, 422, 'Select a package before choosing a date and time.');
             abort_unless($changes['location_id'] ?? $draft->location_id, 422, 'Select a saved location before choosing a date and time.');
             if ($package->is_open_package) {
-                $this->assertAllOpenAttributes($package, $changes['open_package_attributes'] ?? $draft->open_package_attributes ?? []);
+                $changes['open_package_attributes'] = $this->normalizeOpenAttributes(
+                    $package,
+                    $changes['open_package_attributes'] ?? $draft->open_package_attributes ?? [],
+                );
             }
             $date = (string) ($input['booking_date'] ?? optional($draft->start_time)->format('Y-m-d'));
             $time = (string) ($input['slot'] ?? optional($draft->start_time)->format('H:i'));
@@ -147,7 +151,7 @@ class ChatBookingService
             $result['_action'] = [
                 'type' => 'select_note',
                 'title' => 'Would you like to add a note?',
-                'electronic_payment_warning' => $draft->payment_method === 'electric',
+                'electronic_payment_warning' => $draft->payment_method === 'card',
                 'options' => [
                     ['label' => 'Add note', 'label_ar' => 'إضافة ملاحظة', 'message' => 'I want to add a note', 'message_ar' => 'أريد إضافة ملاحظة'],
                     ['label' => 'No note', 'label_ar' => 'بدون ملاحظة', 'message' => 'No note', 'message_ar' => 'بدون ملاحظة'],
@@ -172,9 +176,9 @@ class ChatBookingService
                 'type' => $attribute->type,
                 'unit_price' => (float) $attribute->pivot->price,
                 'unit_duration' => (int) $attribute->pivot->duration,
-                'required' => true,
+                'required' => false,
             ])->values()->all(),
-            'note' => 'Every Open Package attribute is required and must have a quantity of at least 1 before availability can be loaded.',
+            'note' => 'Open Package attributes are optional. Use quantity 0 for any number or unchecked boolean attribute the client does not want.',
         ];
     }
 
@@ -190,7 +194,7 @@ class ChatBookingService
 
         $attributes = $arguments['attributes'] ?? $draft->open_package_attributes ?? [];
         if ($package->is_open_package) {
-            $attributes = $this->assertAllOpenAttributes($package->loadMissing('service.attributes'), $attributes);
+            $attributes = $this->normalizeOpenAttributes($package->loadMissing('service.attributes'), $attributes);
         }
         $request = Request::create('/chat/availability', $package->is_open_package ? 'POST' : 'GET', [
             'latitude' => $location->latitude,
@@ -254,7 +258,7 @@ class ChatBookingService
             'summary_hash' => $hash, 'summary_message_count' => $conversation->messages()->count(), 'validated_at' => now()]);
         $action = ['type' => 'booking_summary', 'draft_id' => $draft->id, 'summary' => $summary,
             'confirm_message' => 'Confirm booking', 'change_message' => 'Change booking details',
-            'electronic_payment_warning' => $draft->payment_method === 'electric'];
+            'electronic_payment_warning' => $draft->payment_method === 'card'];
         return ['valid' => true, 'summary' => $summary, 'confirmation_required' => true, '_action' => $action];
     }
 
@@ -264,9 +268,9 @@ class ChatBookingService
             return ['created' => false, 'error' => 'Explicit confirmation is required after the booking summary.'];
         }
 
-        return DB::transaction(function () use ($conversation, $user) {
+        return Cache::lock('chat-booking-draft:' . $conversation->id, 30)->block(5, function () use ($conversation, $user) {
             $draft = ChatBookingDraft::query()->where('chat_conversation_id', $conversation->id)
-                ->where('user_id', $user->id)->lockForUpdate()->firstOrFail();
+                ->where('user_id', $user->id)->firstOrFail();
             if ($draft->created_order_id) return $this->createdResult($draft->createdOrder()->firstOrFail());
             abort_unless($draft->summary_hash && $draft->validated_at, 422, 'Show and confirm a current booking summary first.');
             abort_unless($conversation->messages()->count() > (int) $draft->summary_message_count, 422,
@@ -294,12 +298,28 @@ class ChatBookingService
                 ? $this->orders->bookOpenPackage($request, $this->routes)
                 : $this->orders->store($request, $this->routes);
             $payload = $response->getData(true);
+            if ($response->getStatusCode() === 409) {
+                $draft->update([
+                    'start_time' => null,
+                    'summary_hash' => null,
+                    'summary_message_count' => null,
+                    'validated_at' => null,
+                ]);
+                $availability = $this->availability($conversation, $user);
+
+                return [
+                    'created' => false,
+                    'error' => $payload['message'] ?? 'The selected time is no longer available.',
+                    'available_slots' => $availability['slots'] ?? [],
+                    '_action' => $availability['_action'] ?? null,
+                ];
+            }
             if ($response->getStatusCode() >= 400) return ['created' => false, 'error' => $payload['message'] ?? 'Booking could not be created.'];
             $orderId = (int) data_get($payload, 'data.id');
             abort_unless($orderId > 0, 500, 'The booking response was invalid.');
             $draft->update(['created_order_id' => $orderId]);
             return $this->createdResult(Order::findOrFail($orderId));
-        }, 3);
+        });
     }
 
     private function ownedDraft(ChatConversation $conversation, User $user): ChatBookingDraft
@@ -339,7 +359,7 @@ class ChatBookingService
 
     private function createdResult(Order $order): array
     {
-        $paymentRequired = $order->payment_method === 'electric' && $order->payment_status === 'pending';
+        $paymentRequired = $order->payment_method === 'card' && $order->payment_status === 'pending';
         $action = ['type' => $paymentRequired ? 'payment_required' : 'booking_created',
             'order_id' => $order->id, 'payment_method' => $order->payment_method,
             'payment_required' => $paymentRequired, 'electronic_payment_warning' => $paymentRequired];
@@ -366,23 +386,13 @@ class ChatBookingService
             'note_or_skip_note' => $draft->note_handled,
         ])->filter(fn ($value) => !$value)->keys()->all();
 
-        if ($draft->package_id) {
-            $package = Package::with('service.attributes')->find($draft->package_id);
-            if ($package?->is_open_package) {
-                $state = $this->openAttributeState($package, $draft->open_package_attributes ?? []);
-                if ($state['missing'] !== []) $missing[] = 'open_package_attributes';
-            }
-        }
-
         return array_values(array_unique($missing));
     }
 
-    private function assertAllOpenAttributes(Package $package, array $attributes): array
+    private function normalizeOpenAttributes(Package $package, array $attributes): array
     {
         $state = $this->openAttributeState($package, $attributes);
         abort_if($state['invalid'] !== [], 422, 'Open Package attributes contain invalid values.');
-        abort_if($state['missing'] !== [], 422,
-            'Complete every Open Package attribute before continuing: '.implode(', ', $state['missing_names']));
         return $state['attributes'];
     }
 
@@ -393,13 +403,16 @@ class ChatBookingService
             'id' => (int) ($item['id'] ?? 0),
             'qty' => (int) ($item['qty'] ?? 0),
         ])->keyBy('id');
-        $invalid = $provided->filter(fn ($item, $id) => !$allowed->has($id) || $item['qty'] < 1)->keys()->all();
-        $missing = $allowed->keys()->diff($provided->filter(fn ($item) => $item['qty'] >= 1)->keys())->values();
+        $invalid = $provided->filter(fn ($item, $id) => !$allowed->has($id) || $item['qty'] < 0)->keys()->all();
+        $normalized = $allowed->keys()->map(fn ($id) => [
+            'id' => (int) $id,
+            'qty' => (int) ($provided->get($id)['qty'] ?? 0),
+        ]);
         return [
-            'attributes' => $provided->values()->all(),
+            'attributes' => $normalized->values()->all(),
             'invalid' => $invalid,
-            'missing' => $missing->all(),
-            'missing_names' => $missing->map(fn ($id) => $allowed[$id]->name_en ?? $allowed[$id]->name_ar ?? "Attribute $id")->all(),
+            'missing' => [],
+            'missing_names' => [],
         ];
     }
 }

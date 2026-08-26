@@ -42,20 +42,16 @@ class LocationController extends Controller
     }
 
   
-    public function show(Location $location)
+    public function show(int $location)
     {
-        if ($location->user_id !== Auth::id()) {
-            return $this->error('Unauthorized', 403);
-        }
+        $location = Location::where('user_id', Auth::id())->findOrFail($location);
 
         return $this->successResponse($location, 'Location retrieved successfully');
     }
 
-    public function update(Request $request, Location $location)
+    public function update(Request $request, int $location)
     {
-        if ($location->user_id !== Auth::id()) {
-            return $this->error('Unauthorized', 403);
-        }
+        $location = Location::where('user_id', Auth::id())->findOrFail($location);
                
         $validated = $request->validate([
             'name' => 'nullable|string|max:255',
@@ -69,11 +65,9 @@ class LocationController extends Controller
             return $this->successResponse($location, 'Location updated successfully');
         }
 
-    public function destroy(Location $location)
+    public function destroy(int $location)
     {
-        if ($location->user_id !== Auth::id()) {
-            return $this->error('Unauthorized', 403);
-        }
+        $location = Location::where('user_id', Auth::id())->findOrFail($location);
                
         $location->delete();
 

@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->foreignId('package_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('location_id')->nullable()->constrained()->nullOnDelete();
             $table->dateTime('start_time')->nullable();
-            $table->enum('payment_method', ['manual', 'electric'])->nullable();
+            $table->enum('payment_method', ['cash', 'card'])->nullable();
             $table->text('note')->nullable();
             $table->boolean('note_handled')->default(false);
             $table->json('open_package_attributes')->nullable();

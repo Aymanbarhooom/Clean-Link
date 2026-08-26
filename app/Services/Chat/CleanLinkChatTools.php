@@ -26,11 +26,11 @@ class CleanLinkChatTools
             self::tool('get_company_services', 'Get services for one company.', $id('company_id')),
             self::tool('get_service_packages', 'Get packages for one service.', $id('service_id')),
             self::tool('get_package_details', 'Get current package details and price.', $id('package_id')),
-            self::tool('get_open_package_requirements', 'Get every mandatory Open Package attribute and backend unit price/duration. Collect qty >= 1 for all returned attributes.', $id('package_id')),
+            self::tool('get_open_package_requirements', 'Get optional Open Package attributes and backend unit price/duration. Use qty 0 for every unselected number or boolean.', $id('package_id')),
             self::tool('get_my_locations', 'Get saved locations owned by this client.', $none),
             self::tool('get_location_details', 'Get one saved location owned by this client.', $id('location_id')),
             self::tool('get_available_dates', 'Get dates containing real backend availability.', self::availabilitySchema()),
-            self::tool('get_available_slots', 'Get real backend-computed slots. Open Packages require every attribute first. Never calculate slots yourself.', self::availabilitySchema()),
+            self::tool('get_available_slots', 'Get real backend-computed slots. Open Package attributes may be zero. Never calculate slots yourself.', self::availabilitySchema()),
             self::tool('get_my_orders', 'Get recent orders owned by this client.', ['type' => 'OBJECT', 'properties' => ['status' => ['type' => 'STRING', 'nullable' => true]]]),
             self::tool('get_my_last_order', 'Get the latest order owned by this client.', $none),
             self::tool('get_my_order', 'Get one order owned by this client.', $id('order_id')),
@@ -41,7 +41,7 @@ class CleanLinkChatTools
             self::tool('get_current_offers', 'Get current services with discounts.', $none),
             self::tool('get_my_favorites', 'Get favorites owned by this client.', $none),
             self::tool('get_booking_draft', 'Get the server-owned booking draft for this conversation.', $none),
-            self::tool('update_booking_draft', 'Validate and update only allowed booking selections in company, service, package, all Open Package attributes, location, date/time, payment, note order. Changing dependencies resets later fields.', [
+            self::tool('update_booking_draft', 'Validate and update only allowed booking selections in company, service, package, optional Open Package attributes, location, date/time, payment, note order. Changing dependencies resets later fields.', [
                 'type' => 'OBJECT', 'properties' => [
                     'company_id' => ['type' => 'INTEGER', 'nullable' => true], 'service_id' => ['type' => 'INTEGER', 'nullable' => true],
                     'package_id' => ['type' => 'INTEGER', 'nullable' => true], 'location_id' => ['type' => 'INTEGER', 'nullable' => true],

@@ -13,19 +13,64 @@ use Illuminate\Http\Request;
 use Stripe\StripeClient;
 use App\Traits\ApiResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class PaymentController extends Controller
 {
     use ApiResponse;
+
+    private function validatePaymentFilters(Request $request): void
+    {
+        $request->validate([
+            'payment_method' => ['nullable', 'in:cash,card'],
+            'status' => ['nullable', 'in:pending,held,captured,refunded,failed'],
+        ]);
+    }
+
+    private function clientPaymentData(Payment $payment): array
+    {
+        $payment->loadMissing('order.package.service.company');
+        $order = $payment->order;
+        $package = $order?->package;
+        $service = $package?->service;
+        $company = $service?->company;
+
+        return [
+            'id' => $payment->id,
+            'order_id' => $payment->order_id,
+            'order_status' => $order?->status,
+            'amount' => (float) $payment->amount,
+            'currency' => strtoupper($payment->currency ?: 'USD'),
+            'payment_method' => $payment->payment_method,
+            'payment_status' => $payment->payment_status,
+            'service' => $service ? [
+                'id' => $service->id,
+                'name_ar' => $service->name_ar,
+                'name_en' => $service->name_en,
+            ] : null,
+            'package' => $package ? [
+                'id' => $package->id,
+                'name_ar' => $package->name_ar,
+                'name_en' => $package->name_en,
+            ] : null,
+            'company' => $company ? [
+                'id' => $company->id,
+                'name_ar' => $company->name_ar,
+                'name_en' => $company->name_en,
+            ] : null,
+            'booking_date' => $order?->start_time?->toIso8601String(),
+            'paid_at' => $payment->paid_at?->toIso8601String(),
+            'created_at' => $payment->created_at?->toIso8601String(),
+        ];
+    }
+
     public function createPaymentIntent(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'order_id' => 'required|exists:orders,id',
         ]);
 
-        $order = Order::find($validated['order_id']);
-
-
+        $order = Order::findOrFail($validated['order_id']);
         if ($order->client_id !== auth()->id()) {
             return $this->errorResponse(
                 'You are not authorized to pay for this order',
@@ -37,7 +82,7 @@ class PaymentController extends Controller
 
         if ($order->payment_method !== 'card') {
             return $this->errorResponse(
-                'This order does not use electronic payment',
+                'This order does not use card payment',
                 422
             );
         }
@@ -62,69 +107,91 @@ class PaymentController extends Controller
 
 
         try {
-            $stripe = new StripeClient(
-                config('services.stripe.secret')
-            );
+            return Cache::lock('stripe-intent-order:' . $order->id, 30)->block(5, function () use ($order) {
+                $order->refresh();
+                if ($order->payment_status !== 'pending' || in_array($order->status, ['canceled', 'completed', 'in_process'], true)) {
+                    return $this->errorResponse('This order is not available for payment', 422);
+                }
 
+                $amount = (int) round($order->total_price * 100);
+                if ($amount <= 0) {
+                    return $this->errorResponse('Invalid order amount', 422);
+                }
 
+                $payment = $order->payments()->latest()->firstOrFail();
+                $stripe = new StripeClient(config('services.stripe.secret'));
+                $intentId = $payment->stripe_payment_intent_id ?: $order->stripe_payment_intent_id;
 
-            $amount = (int) round($order->total_price * 100);
+                if ($intentId) {
+                    $existing = $stripe->paymentIntents->retrieve($intentId);
+                    $viable = ['requires_payment_method', 'requires_confirmation', 'requires_action', 'processing', 'requires_capture'];
+                    if ($existing->status === 'succeeded') {
+                        DB::transaction(function () use ($order, $payment) {
+                            $order->update(['payment_status' => 'captured', 'is_company_paid' => false]);
+                            $payment->update(['payment_status' => 'captured', 'paid_at' => now()]);
+                        }, 3);
 
-            if ($amount <= 0) {
-                return $this->errorResponse(
-                    'Invalid order amount',
-                    422
-                );
-            }
+                        return $this->errorResponse('This order payment is already complete', 422);
+                    }
+                    if (in_array($existing->status, $viable, true)
+                        && (int) $existing->amount === $amount
+                        && strtolower((string) $existing->currency) === 'usd') {
+                        $payment->update(['stripe_payment_intent_id' => $existing->id]);
+                        $order->update(['stripe_payment_intent_id' => $existing->id]);
+                        return $this->paymentIntentResponse($order, $existing, $amount);
+                    }
+                    if (in_array($existing->status, $viable, true)) {
+                        $stripe->paymentIntents->cancel($existing->id);
+                    }
+                }
 
+                $replacingKnownIntent = $intentId !== null;
+                $attempt = DB::transaction(function () use ($payment, $replacingKnownIntent) {
+                    $locked = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+                    if ($locked->stripe_attempt === 0) {
+                        $locked->update(['stripe_attempt' => 1]);
+                    } elseif ($replacingKnownIntent) {
+                        $locked->increment('stripe_attempt');
+                    }
+                    return $locked->stripe_attempt;
+                }, 3);
 
-            $paymentIntent = $stripe->paymentIntents->create([
-                'amount' => $amount,
-                'currency' => 'usd',
-                'capture_method' => 'manual',
-                'payment_method_types' => ['card'],
-
-                'metadata' => [
-                    'order_id' => (string) $order->id,
-                    'client_id' => (string) $order->client_id,
-                    'package_id' => (string) $order->package_id,
-                ],
-            ]);
-
-
-
-            $order->update([
-                'stripe_payment_intent_id' => $paymentIntent->id,
-            ]);
-
-
-
-            return $this->successResponse(
-                [
-                    'order_id' => $order->id,
+                $intent = $stripe->paymentIntents->create([
                     'amount' => $amount,
                     'currency' => 'usd',
-                    'payment_intent_id' => $paymentIntent->id,
-                    'client_secret' => $paymentIntent->client_secret,
-                ],
-                'Payment intent created successfully',
-                200
-            );
+                    'capture_method' => 'manual',
+                    'payment_method_types' => ['card'],
+                    'metadata' => [
+                        'order_id' => (string) $order->id,
+                        'payment_id' => (string) $payment->id,
+                        'client_id' => (string) $order->client_id,
+                        'package_id' => (string) $order->package_id,
+                    ],
+                ], ['idempotency_key' => "cleanlink-order-{$order->id}-payment-{$payment->id}-attempt-{$attempt}"]);
 
-        } catch (\Stripe\Exception\ApiErrorException $e) {
+                DB::transaction(function () use ($order, $payment, $intent) {
+                    $order->update(['stripe_payment_intent_id' => $intent->id]);
+                    $payment->update(['stripe_payment_intent_id' => $intent->id]);
+                }, 3);
 
-            return $this->errorResponse(
-                'Unable to create payment intent: ' . $e->getMessage(),
-                500
-            );
-
-        } catch (\Exception $e) {
-
-            return $this->errorResponse(
-                'An unexpected error occurred while creating the payment',
-                500
-            );
+                return $this->paymentIntentResponse($order, $intent, $amount);
+            });
+        } catch (\Throwable $exception) {
+            report($exception);
+            return $this->errorResponse('Unable to prepare card payment. Please try again.', 503);
         }
+    }
+
+    private function paymentIntentResponse(Order $order, object $intent, int $amount): JsonResponse
+    {
+        return $this->successResponse([
+            'order_id' => $order->id,
+            'amount' => $amount,
+            'currency' => 'usd',
+            'payment_intent_id' => $intent->id,
+            'client_secret' => $intent->client_secret,
+            'payment_status' => $order->payment_status,
+        ], 'Payment intent is ready', 200);
     }
 
     // ==========================================
@@ -134,9 +201,11 @@ class PaymentController extends Controller
 
     public function clientPayments(Request $request): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $user = auth()->user();
 
-        $query = Payment::where('user_id', $user->id);
+        $query = Payment::with('order.package.service.company')
+            ->where('user_id', $user->id);
 
         if ($request->filled('status')) {
             $query->where('payment_status', $request->status);
@@ -147,49 +216,29 @@ class PaymentController extends Controller
         }
 
         $perPage = $request->get('per_page', 10);
-        $orders = $query->latest()->paginate($perPage);
+        $payments = $query->latest()->paginate($perPage);
+        $payments->through(fn (Payment $payment) => $this->clientPaymentData($payment));
 
-        return $this->successResponse($orders, 'Client payments retrieved successfully', 200);
+        return $this->successResponse($payments, 'Client payments retrieved successfully', 200);
     }
 
 
     public function clientShowPayment($id): JsonResponse
     {
         $user = auth()->user();
-        $order = Order::with(['package.service.company'])
-            ->where('client_id', $user->id)
+        $payment = Payment::with('order.package.service.company')
+            ->where('user_id', $user->id)
             ->find($id);
 
-        if (!$order) {
+        if (!$payment) {
             return $this->errorResponse('Payment not found', 404);
         }
 
-        return $this->successResponse([
-            'id' => $order->id,
-            'order' => [
-                'id' => $order->id,
-                'status' => $order->status
-            ],
-            'company' => [
-                'id' => $order->package->service->company->id ?? null,
-                'name' => $order->package->service->company->name ?? '',
-            ],
-            'service' => [
-                'id' => $order->package->service->id ?? null,
-                'name' => $order->package->service->name ?? '',
-            ],
-            'package' => [
-                'id' => $order->package->id ?? null,
-                'name' => $order->package->name ?? '',
-            ],
-            'total_price' => (float) $order->total_price,
-            'currency' => 'USD',
-            'payment_method' => $order->payment_method === 'card' ? 'card' : 'cash',
-            'payment_status' => $order->payment_status,
-            'stripe_payment_intent_id' => $order->stripe_payment_intent_id,
-            'paid_at' => $order->updated_at->toIso8601String(),
-            'created_at' => $order->created_at->toIso8601String(),
-        ], 'Payment retrieved successfully', 200);
+        return $this->successResponse(
+            $this->clientPaymentData($payment),
+            'Payment retrieved successfully',
+            200
+        );
     }
 
     // ==========================================
@@ -238,6 +287,7 @@ class PaymentController extends Controller
 
     public function companyPaymentsSummary(Request $request, Company $company): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $query = Order::whereHas('package.service', fn($q) => $q->where('company_id', $company->id))
             ->whereIn('payment_status', ['captured', 'held']);
 
@@ -261,7 +311,7 @@ class PaymentController extends Controller
         $totalPayments = $query->count();
 
         $cashQuery = (clone $query)->where('payment_method', 'cash');
-        $electricQuery = (clone $query)->where('payment_method', 'card');
+        $cardQuery = (clone $query)->where('payment_method', 'card');
 
         return $this->successResponse([
             'gross_revenue' => $grossRevenue,
@@ -271,9 +321,9 @@ class PaymentController extends Controller
                 'total_amount' => (float) $cashQuery->sum('total_price'),
                 'payments_count' => $cashQuery->count(),
             ],
-            'electric' => [
-                'total_amount' => (float) $electricQuery->sum('total_price'),
-                'payments_count' => $electricQuery->count(),
+            'card' => [
+                'total_amount' => (float) $cardQuery->sum('total_price'),
+                'payments_count' => $cardQuery->count(),
             ],
             'system_profit' => (float) $query->sum('admin_share'),
             'company_profit' => (float) $query->sum('company_share'),
@@ -283,6 +333,7 @@ class PaymentController extends Controller
 
     public function companyPaymentsSearch(Request $request, Company $company): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $query = Order::with(['client', 'package.service'])
             ->whereHas('package.service', fn($q) => $q->where('company_id', $company->id));
 
@@ -354,6 +405,7 @@ class PaymentController extends Controller
 
     public function companyServicesStats(Request $request, Company $company): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $services = Service::where('company_id', $company->id)->get()->map(function ($service) use ($request) {
             $orders = Order::whereHas('package', fn($q) => $q->where('service_id', $service->id));
 
@@ -380,7 +432,7 @@ class PaymentController extends Controller
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'company_profit' => (float) $paidOrders->sum('company_share'),
                 'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
+                'card_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
             ];
         });
 
@@ -469,6 +521,7 @@ class PaymentController extends Controller
 
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $query = Order::whereIn('payment_status', ['captured', 'held']);
 
         if ($request->filled('company_id')) {
@@ -499,7 +552,7 @@ class PaymentController extends Controller
         $totalPayments = $query->count();
 
         $cashQuery = (clone $query)->where('payment_method', 'cash');
-        $electricQuery = (clone $query)->where('payment_method', 'card');
+        $cardQuery = (clone $query)->where('payment_method', 'card');
 
         return $this->successResponse([
             'gross_revenue' => $grossRevenue,
@@ -509,9 +562,9 @@ class PaymentController extends Controller
                 'total_amount' => (float) $cashQuery->sum('total_price'),
                 'payments_count' => $cashQuery->count(),
             ],
-            'electric' => [
-                'total_amount' => (float) $electricQuery->sum('total_price'),
-                'payments_count' => $electricQuery->count(),
+            'card' => [
+                'total_amount' => (float) $cardQuery->sum('total_price'),
+                'payments_count' => $cardQuery->count(),
             ],
             'system_profit' => (float) $query->sum('admin_share'),
             'companies_profit' => (float) $query->sum('company_share'),
@@ -570,6 +623,7 @@ class PaymentController extends Controller
 
     public function adminPaymentsSearch(Request $request): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $query = Order::with(['client', 'package.service.company.region']);
 
         if ($request->filled('company_id')) {
@@ -609,6 +663,7 @@ class PaymentController extends Controller
 
     public function adminCompaniesStats(Request $request): JsonResponse
 {
+    $this->validatePaymentFilters($request);
     $companiesQuery = Company::query();
 
     if ($request->filled('region_id')) {
@@ -650,7 +705,7 @@ class PaymentController extends Controller
             'payments_count' => $paidOrders->count(),
             'gross_revenue' => (float) $paidOrders->sum('total_price'),
             'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-            'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
+            'card_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
             'system_profit' => (float) $paidOrders->sum('admin_share'),
             'company_profit' => (float) $paidOrders->sum('company_share'),
         ];
@@ -663,6 +718,7 @@ class PaymentController extends Controller
 
     public function adminRegionsStats(Request $request): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $regions = Region::all()->map(function ($region) use ($request) {
             $orders = Order::whereHas('package.service.company', fn($q) => $q->where('region_id', $region->id));
 
@@ -688,7 +744,7 @@ class PaymentController extends Controller
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
                 'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
+                'card_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];
@@ -700,6 +756,7 @@ class PaymentController extends Controller
 
     public function adminServicesStats(Request $request): JsonResponse
     {
+        $this->validatePaymentFilters($request);
         $services = Service::all()->map(function ($service) use ($request) {
             $orders = Order::whereHas('package', fn($q) => $q->where('service_id', $service->id));
 
@@ -732,7 +789,7 @@ class PaymentController extends Controller
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
                 'cash_revenue' => (float) (clone $paidOrders)->where('payment_method', 'cash')->sum('total_price'),
-                'electric_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
+                'card_revenue' => (float) (clone $paidOrders)->where('payment_method', 'card')->sum('total_price'),
                 'system_profit' => (float) $paidOrders->sum('admin_share'),
                 'companies_profit' => (float) $paidOrders->sum('company_share'),
             ];

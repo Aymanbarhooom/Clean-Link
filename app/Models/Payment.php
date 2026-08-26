@@ -14,12 +14,15 @@ class Payment extends Model
         'currency',
         'payment_method',
         'payment_status',
+        'stripe_payment_intent_id',
+        'stripe_attempt',
         'paid_at',
     ];
 
     protected $casts = [
         'amount' => 'float',
         'paid_at' => 'datetime',
+        'stripe_attempt' => 'integer',
     ];
 
     public function user(): BelongsTo
