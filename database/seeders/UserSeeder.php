@@ -34,7 +34,7 @@ class UserSeeder extends Seeder
         $cm2->profile()->create(['phone' => '+96311444444', 'address' => 'Sparkle Solutions Base']);
 
         $client1 = User::create([
-            'fullname' => 'يعقوب قمر الدين',
+            'fullname' => 'Johny Deep',
             'email' => 'client1@cleaning.com',
             'password' => Hash::make('password123'),
             'role' => 'client',
@@ -42,7 +42,7 @@ class UserSeeder extends Seeder
         $client1->profile()->create(['phone' => '+96311555555', 'address' => 'Client One Residence', 'image' => 'worker_profiles/worker1.jpg']);
 
         $client2 = User::create([
-            'fullname' => 'خالد كشميري',
+            'fullname' => 'Sami Yousuf',
             'email' => 'client2@cleaning.com',
             'password' => Hash::make('password123'),
             'role' => 'client',
@@ -50,7 +50,7 @@ class UserSeeder extends Seeder
         $client2->profile()->create(['phone' => '+96311666666', 'address' => 'Client Two Residence', 'image' => 'worker_profiles/worker2.jpg']);
 
         $client3 = User::create([
-            'fullname' => 'خضر كراويتة',
+            'fullname' => 'Christian Bale',
             'email' => 'client3@cleaning.com',
             'password' => Hash::make('password123'),
             'role' => 'client',

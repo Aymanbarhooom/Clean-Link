@@ -30,7 +30,7 @@ class AtomicBookingService
         int $minimumWorkers,
         array $attributePivot = [],
     ): array {
-        $effectiveEndTime = $startTime->copy()->addMinutes($serviceDuration + $travelBufferMinutes);
+        $effectiveEndTime = $startTime->copy()->addMinutes($serviceDuration);
 
         $result = DB::transaction(function () use (
             $client, $package, $input, $startTime, $serviceDuration,
