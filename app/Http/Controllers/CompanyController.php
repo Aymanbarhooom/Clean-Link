@@ -11,6 +11,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class CompanyController extends Controller
 {
@@ -75,7 +76,7 @@ class CompanyController extends Controller
         $this->authorize('create', Company::class);
 
         $validated = $request->validate([
-            'manager_id' => 'required|exists:users,id',
+            'manager_id' => ['required', Rule::exists('users', 'id')->where('role', 'company_manager')],
             'region_id' => 'required|exists:regions,id',
             'name_ar' => 'required|string',
             'name_en' => 'required|string',
@@ -83,8 +84,8 @@ class CompanyController extends Controller
             'description_en' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
-            'longitude' => 'nullable|numeric',
-            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'latitude' => 'nullable|numeric|between:-90,90',
             'image' => 'nullable|image|max:2048'
         ]);
 
@@ -127,14 +128,16 @@ class CompanyController extends Controller
     {
         $this->authorize('update', $company);
         $validated = $request->validate([
+            'manager_id' => ['sometimes', Rule::exists('users', 'id')->where('role', 'company_manager')],
+            'region_id' => 'sometimes|exists:regions,id',
             'name_ar' => 'sometimes|string',
             'name_en' => 'sometimes|string',
             'description_ar' => 'nullable|string',
             'description_en' => 'nullable|string',
             'location_ar' => 'nullable|string',
             'location_en' => 'nullable|string',
-            'longitude' => 'nullable|numeric',
-            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'latitude' => 'nullable|numeric|between:-90,90',
             'image' => 'nullable|image|max:2048'
         ]);
 
@@ -188,7 +191,7 @@ class CompanyController extends Controller
     public function showCompany(Company $company): JsonResponse
     {
         $this->authorize('view', $company);
-        $company->load(['region', 'services', 'workers.user.profile', 'reviews.client.profile','workTimes']);
+        $company->load(['manager.profile', 'region.manager', 'services', 'workers.user.profile', 'reviews.client.profile','workTimes']);
         $user = auth()->user();
         if ($user->isAdmin() || $user->isCompanyManager() || $user->isRegionManager()) {
             return $this->successResponse($company, 'Company profile retrieved');
@@ -207,5 +210,43 @@ class CompanyController extends Controller
     {
         $companies = Company::all();
         return $this->successResponse(CompanyNameResource::collection($companies), 'Companies names retrieved successfully');
+    }
+
+    public function adminLocations(Request $request): JsonResponse
+    {
+        if (!auth()->user()?->isAdmin()) {
+            return $this->errorResponse('Access restricted to administrators only', 403);
+        }
+
+        $validated = $request->validate([
+            'query' => 'nullable|string|max:255',
+            'region_id' => 'nullable|integer|exists:regions,id',
+        ]);
+
+        $query = trim((string) ($validated['query'] ?? ''));
+        $companies = Company::query()
+            ->select([
+                'id', 'manager_id', 'region_id', 'name_ar', 'name_en',
+                'location_ar', 'location_en', 'latitude', 'longitude', 'rating',
+            ])
+            ->with([
+                'region:id,name_ar,name_en',
+                'manager:id,fullname,email',
+            ])
+            ->when($query !== '', function ($builder) use ($query) {
+                $builder->where(function ($nested) use ($query) {
+                    $nested->where('name_ar', 'like', "%{$query}%")
+                        ->orWhere('name_en', 'like', "%{$query}%")
+                        ->orWhere('location_ar', 'like', "%{$query}%")
+                        ->orWhere('location_en', 'like', "%{$query}%");
+                });
+            })
+            ->when($validated['region_id'] ?? null, fn ($builder, $regionId) => $builder->where('region_id', $regionId))
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->orderBy('name_en')
+            ->get();
+
+        return $this->successResponse($companies, 'Company map locations retrieved successfully');
     }
 }

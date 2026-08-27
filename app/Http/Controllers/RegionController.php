@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 
 class RegionController extends Controller
 {
@@ -69,6 +70,7 @@ class RegionController extends Controller
         $validated = $request->validate([
             'name_ar' => 'required|string',
             'name_en' => 'required|string',
+            'manager_id' => ['required', Rule::exists('users', 'id')->where('role', 'region_manager')],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if ($request->hasFile('image')) {
@@ -76,9 +78,8 @@ class RegionController extends Controller
             $validated['image'] = $path;
         }
 
-        $validated['manager_id'] = 1;
-        
         $region = Region::create($validated);
+        Cache::forget('all_regions_with_managers_all');
         return $this->successResponse($region, 'Region created successfully', 211);
     }
     public function updateRegion(Request $request, Region $region): JsonResponse
@@ -90,6 +91,7 @@ class RegionController extends Controller
         $validated = $request->validate([
             'name_ar' => 'sometimes|required|string',
             'name_en' => 'sometimes|required|string',
+            'manager_id' => ['sometimes', Rule::exists('users', 'id')->where('role', 'region_manager')],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
         if ($request->hasFile('image')) {
@@ -97,6 +99,8 @@ class RegionController extends Controller
             $validated['image'] = $path;
         }
         $region->update($validated);
+        Cache::forget('all_regions_with_managers_all');
+        Cache::forget('region_' . $region->id . '_details_with_manager_companies');
         return $this->successResponse($region, 'Region updated successfully');
     }
 
@@ -201,6 +205,8 @@ protected function paginateCollection($collection, int $perPage, int $currentPag
         }
 
         $region->delete();
+        Cache::forget('all_regions_with_managers_all');
+        Cache::forget('region_' . $region->id . '_details_with_manager_companies');
         return $this->successResponse([], 'Region deleted successfully');
     }
     public function getRegionsNames(): JsonResponse

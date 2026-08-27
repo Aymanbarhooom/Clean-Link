@@ -28,7 +28,7 @@ class CompanyPolicy
 
     public function update(User $user, Company $company): bool
     {
-        return $user->isCompanyManager() && $user->id === $company->manager_id;
+        return $user->isAdmin() || ($user->isCompanyManager() && $user->id === $company->manager_id);
     }
 
     public function delete(User $user, Company $company): bool

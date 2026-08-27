@@ -8,7 +8,9 @@ use App\Models\Company;
 use App\Models\Region;
 use App\Models\Service;
 use App\Models\Skill;
+use App\Models\Task;
 use App\Models\User;
+use App\Http\Resources\OrderResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -388,9 +390,10 @@ public function getWorkers(Request $request): JsonResponse
         if ($user->role !== 'client') {
             return $this->errorResponse('Requested user is not a client', 404);
         }
-        $number_of_orders = $user->orders()->count();
+        $client = $user->load(['profile']);
+        $client->setAttribute('number_of_orders', $user->orders()->count());
 
-        return $this->successResponse([$user->load(['profile']), 'number_of_orders' => $number_of_orders], 'Client details fetched successfully');
+        return $this->successResponse($client, 'Client details fetched successfully');
     }
 
     public function showWorker(User $user): JsonResponse
@@ -398,7 +401,7 @@ public function getWorkers(Request $request): JsonResponse
         $currentUser = auth()->user();
 
         if ($currentUser?->isAdmin()) {
-            return $this->successResponse($user->load(['profile', 'workerProfile.company']), 'Worker details fetched successfully');
+            return $this->successResponse($this->workerDetails($user), 'Worker details fetched successfully');
         }
 
         if (!$currentUser?->isCompanyManager()) {
@@ -416,7 +419,48 @@ public function getWorkers(Request $request): JsonResponse
             return $this->errorResponse('Access restricted to workers in your companies', 403);
         }
 
-        return $this->successResponse($user->load(['profile', 'workerProfile.company']), 'Worker details fetched successfully');
+        return $this->successResponse($this->workerDetails($user), 'Worker details fetched successfully');
+    }
+
+    private function workerDetails(User $user): User
+    {
+        $user->load(['profile', 'workerProfile.company', 'workerProfile.skills']);
+
+        $history = Task::query()
+            ->whereHas('workgroup.workers', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->with([
+                'order.client.profile',
+                'order.package.service',
+                'workgroup',
+            ])
+            ->latest('tasks.created_at')
+            ->get()
+            ->map(function (Task $task) use ($user) {
+                return [
+                    'task_id' => $task->id,
+                    'task_status' => $task->status,
+                    'workgroup_id' => $task->workgroup_id,
+                    'workgroup_name' => $task->workgroup?->name,
+                    'is_leader' => (int) $task->workgroup?->leader_id === $user->id,
+                    'image_before' => $task->image_before
+                        ? request()->getSchemeAndHttpHost() . '/storage/' . ltrim($task->image_before, '/')
+                        : null,
+                    'image_after' => $task->image_after
+                        ? request()->getSchemeAndHttpHost() . '/storage/' . ltrim($task->image_after, '/')
+                        : null,
+                    'created_at' => $task->created_at,
+                    'order' => $task->order
+                        ? OrderResource::make($task->order)->resolve(request())
+                        : null,
+                ];
+            })
+            ->values();
+
+        $user->setAttribute('order_history', $history);
+
+        return $user;
     }
 
     public function deleteUser(User $user): JsonResponse

@@ -19,6 +19,13 @@ class PaymentController extends Controller
 {
     use ApiResponse;
 
+    private function denyUnlessAdmin(): ?JsonResponse
+    {
+        return auth()->user()?->isAdmin()
+            ? null
+            : $this->errorResponse('Access restricted to administrators only', 403);
+    }
+
     private function validatePaymentFilters(Request $request): void
     {
         $request->validate([
@@ -488,6 +495,10 @@ class PaymentController extends Controller
 
     public function adminDashboard(): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $paidOrders = Order::whereIn('payment_status', ['captured', 'held']);
 
         return $this->successResponse([
@@ -521,6 +532,10 @@ class PaymentController extends Controller
 
     public function adminPaymentsAnalytics(Request $request): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $this->validatePaymentFilters($request);
         $query = Order::whereIn('payment_status', ['captured', 'held']);
 
@@ -574,6 +589,10 @@ class PaymentController extends Controller
 
     public function adminRevenueChart(Request $request): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $groupByParam = $request->get('group_by', 'month');
         $query = Order::whereIn('payment_status', ['captured', 'held']);
 
@@ -623,6 +642,10 @@ class PaymentController extends Controller
 
     public function adminPaymentsSearch(Request $request): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $this->validatePaymentFilters($request);
         $query = Order::with(['client', 'package.service.company.region']);
 
@@ -663,6 +686,10 @@ class PaymentController extends Controller
 
     public function adminCompaniesStats(Request $request): JsonResponse
 {
+    if ($denied = $this->denyUnlessAdmin()) {
+        return $denied;
+    }
+
     $this->validatePaymentFilters($request);
     $companiesQuery = Company::query();
 
@@ -699,7 +726,9 @@ class PaymentController extends Controller
 
         return [
             'company_id' => $company->id,
-            'company_name' => $company->name_en,
+            'company_name' => $request->header('Accept-Language', 'en') === 'ar' ? $company->name_ar : $company->name_en,
+            'company_name_ar' => $company->name_ar,
+            'company_name_en' => $company->name_en,
             'region_id' => $company->region_id,
             'orders_count' => $ordersQuery->count(),
             'payments_count' => $paidOrders->count(),
@@ -718,6 +747,10 @@ class PaymentController extends Controller
 
     public function adminRegionsStats(Request $request): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $this->validatePaymentFilters($request);
         $regions = Region::all()->map(function ($region) use ($request) {
             $orders = Order::whereHas('package.service.company', fn($q) => $q->where('region_id', $region->id));
@@ -738,7 +771,9 @@ class PaymentController extends Controller
 
             return [
                 'region_id' => $region->id,
-                'region_name' => $region->name,
+                'region_name' => $request->header('Accept-Language', 'en') === 'ar' ? $region->name_ar : $region->name_en,
+                'region_name_ar' => $region->name_ar,
+                'region_name_en' => $region->name_en,
                 'companies_count' => Company::where('region_id', $region->id)->count(),
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
@@ -756,6 +791,10 @@ class PaymentController extends Controller
 
     public function adminServicesStats(Request $request): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $this->validatePaymentFilters($request);
         $services = Service::all()->map(function ($service) use ($request) {
             $orders = Order::whereHas('package', fn($q) => $q->where('service_id', $service->id));
@@ -784,7 +823,9 @@ class PaymentController extends Controller
 
             return [
                 'service_id' => $service->id,
-                'service_name' => $service->name,
+                'service_name' => $request->header('Accept-Language', 'en') === 'ar' ? $service->name_ar : $service->name_en,
+                'service_name_ar' => $service->name_ar,
+                'service_name_en' => $service->name_en,
                 'orders_count' => $orders->count(),
                 'payments_count' => $paidOrders->count(),
                 'gross_revenue' => (float) $paidOrders->sum('total_price'),
@@ -801,6 +842,10 @@ class PaymentController extends Controller
 
     public function adminShowPayment($id): JsonResponse
     {
+        if ($denied = $this->denyUnlessAdmin()) {
+            return $denied;
+        }
+
         $order = Order::with(['client', 'package.service.company.region'])->find($id);
 
         if (!$order) {
@@ -815,19 +860,33 @@ class PaymentController extends Controller
             'order' => ['id' => $order->id],
             'client' => [
                 'id' => $order->client_id,
-                'name' => $order->client->name ?? 'Client'
+                'name' => $order->client->fullname ?? 'Client',
+                'fullname' => $order->client->fullname ?? null,
+                'email' => $order->client->email ?? null,
             ],
             'company' => [
-                'id' => $company->id ?? null,
-                'name' => $company->name ?? ''
+                'id' => $company?->id,
+                'name' => $company
+                    ? (request()->header('Accept-Language', 'en') === 'ar' ? $company->name_ar : $company->name_en)
+                    : '',
+                'name_ar' => $company->name_ar ?? null,
+                'name_en' => $company->name_en ?? null,
             ],
             'region' => [
-                'id' => $company->region->id ?? null,
-                'name' => $company->region->name ?? ''
+                'id' => $company?->region?->id,
+                'name' => $company?->region
+                    ? (request()->header('Accept-Language', 'en') === 'ar' ? $company->region->name_ar : $company->region->name_en)
+                    : '',
+                'name_ar' => $company?->region?->name_ar,
+                'name_en' => $company?->region?->name_en,
             ],
             'service' => [
-                'id' => $service->id ?? null,
-                'name' => $service->name ?? ''
+                'id' => $service?->id,
+                'name' => $service
+                    ? (request()->header('Accept-Language', 'en') === 'ar' ? $service->name_ar : $service->name_en)
+                    : '',
+                'name_ar' => $service->name_ar ?? null,
+                'name_en' => $service->name_en ?? null,
             ],
             'amount' => (float) $order->total_price,
             'payment_method' => $order->payment_method === 'card' ? 'card' : 'cash',

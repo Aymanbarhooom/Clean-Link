@@ -34,6 +34,7 @@ class TaskController extends Controller
         })
             ->with([
                 'order.package.service.company',
+                'order.attributes',
                 'order.client.profile',
                 'workgroup.leader.profile',
                 'workgroup.workers.profile',
@@ -75,6 +76,7 @@ class TaskController extends Controller
         }
         $task->load([
             'order.package.service.company',
+            'order.attributes',
             'order.client.profile',
             'workgroup.leader.profile',
             'workgroup.workers.profile',
@@ -171,6 +173,10 @@ class TaskController extends Controller
         ];
 
         if ($validated['status'] === 'done') {
+            $task->update([
+                'image_before' => $validated['image_before'] ?? $task->image_before,
+                'image_after' => $validated['image_after'] ?? $task->image_after,
+            ]);
             $task->advanceStatus('done');
             $order->update(['status' => 'completed']);
             $order->update(['payment_status' => 'captured']);
@@ -310,7 +316,7 @@ class TaskController extends Controller
             }
         }
 
-        $task->load(['order.package.service', 'workgroup.leader']);
+        $task->load(['order.package.service', 'order.attributes', 'workgroup.leader']);
 
         return $this->successResponse(new TaskResource($task), 'Task progression parameters updated successfully by the leader');
     }

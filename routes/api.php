@@ -281,6 +281,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('admin')->group(function () {
         // Admin Dashboard
         Route::get('/dashboard', [PaymentController::class, 'adminDashboard']);
+        Route::get('/companies/locations', [CompanyController::class, 'adminLocations']);
 
         // Payment Analytics & Reports
         Route::prefix('payments')->group(function () {

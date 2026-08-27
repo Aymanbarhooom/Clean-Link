@@ -42,6 +42,7 @@ class OrderResource extends JsonResource
             'client' => $this->whenLoaded('client'),
             'leader' => $this->getLeaderResource(),
             'package' => new PackageResource($this->package),
+            'tasks' => TaskResource::collection($this->whenLoaded('tasks')),
             'attributes' => $this->whenLoaded('attributes', function () use ($request) {
                 $lang = $request->header('Accept-Language', 'ar');
                 $serviceId = $this->package?->service?->id;
