@@ -48,7 +48,7 @@ class AtomicBookingService
             if ($package->is_open_package) {
                 $minimumWorkers = max(1, (int) ceil($serviceDuration / 30));
             }
-            $effectiveEndTime = $startTime->copy()->addMinutes($serviceDuration + $travelBufferMinutes);
+            $effectiveEndTime = $startTime->copy()->addMinutes($serviceDuration);
 
             $this->assertWithinWorkingHours($company->id, $startTime, $effectiveEndTime, $oneWayMinutes);
 
