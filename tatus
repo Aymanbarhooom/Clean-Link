@@ -1,0 +1,105 @@
+[33mcommit 66e7542e15cffaede31c8304b8228a8ded6ae876[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Thu Aug 27 18:24:44 2026 +0300
+
+    Initial commit without secrets
+
+[33mcommit 138b82b462adc2def06473ca08ab2f8cf55ac80a[m
+Merge: 75769fd4 5ed59a44
+Author: Qusai Abo Khier <149895000+qusaiak@users.noreply.github.com>
+Date:   Fri Aug 21 21:34:04 2026 +0300
+
+    Merge remote-tracking branch 'origin/main'
+    
+    # Conflicts:
+    #       .env
+
+[33mcommit a7f9a47012f3415efc7d64f74c19cc4d54f3344d[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Aug 21 20:39:06 2026 +0300
+
+    chatBot v2
+
+[33mcommit 583f5e888f5c00c2790beb48713eb1356fedbba8[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Aug 21 20:23:19 2026 +0300
+
+    chatBot v2
+
+[33mcommit 13f5792aafceef31aa5790620f044b6b46f12fe6[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Aug 21 19:51:03 2026 +0300
+
+    chatBot v1
+
+[33mcommit 3249d8a14044c768ef6eeaa935d185a736419dbf[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Aug 21 19:50:38 2026 +0300
+
+    chatBot v1
+
+[33mcommit 94a334612d1061c92c17c5d55c21ad763ae361f1[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Aug 21 19:47:10 2026 +0300
+
+    chatBot v1
+
+[33mcommit 6efc31cedd860ecbb2cf0e3b536929c86dacc371[m
+Author: Qusai Abo Khier <149895000+qusaiak@users.noreply.github.com>
+Date:   Sun Aug 16 17:19:47 2026 +0300
+
+    fix bugs
+
+[33mcommit 061814f2803877446b5328dc93ea4d66b4b4ae0f[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sun Aug 16 14:29:42 2026 +0300
+
+    stripe v3
+
+[33mcommit 155d73021f23c9bb351ca19fc2145dc3a6d0bd78[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sat Aug 15 18:19:09 2026 +0300
+
+    stripe v1
+
+[33mcommit 0f8f65b11c81b8f2f1e962e0d6353a4d4a83e75f[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sat Aug 15 18:17:09 2026 +0300
+
+    client-secret v2
+
+[33mcommit 5a32940f0ec2621b5628ac619ac439a53ab501fa[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sat Aug 15 18:05:52 2026 +0300
+
+    client-secret
+
+[33mcommit 0db8fc0fb591d94da1998d014bf1ee9091fbeda3[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sat Aug 8 13:16:32 2026 +0300
+
+    crouse time handling
+
+[33mcommit 3295b4d40985eda4c1e8f8583bca4fd97565b0ed[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Sun Jul 26 15:06:15 2026 +0300
+
+    add/delete skill
+
+[33mcommit 7b1fa3bd1d97c53f4317977270e4164674f5ef9f[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Tue Jul 21 09:45:09 2026 +0300
+
+    OTP
+
+[33mcommit f6450c511e5a567f3236228530eb88a26730ff2c[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Wed Jul 8 23:06:46 2026 +0300
+
+    notification
+
+[33mcommit 0cc78abcbff6969effc0ec1aac6ea9119d6ce924[m
+Author: Aymanbarhooom <aymanbarhooom@gmail.com>
+Date:   Fri Jun 26 10:56:55 2026 +0300
+
+    images

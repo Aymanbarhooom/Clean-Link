@@ -70,9 +70,10 @@ class RegionController extends Controller
         $validated = $request->validate([
             'name_ar' => 'required|string',
             'name_en' => 'required|string',
-            'manager_id' => ['required', Rule::exists('users', 'id')->where('role', 'region_manager')],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
+        $validated['manager_id'] = auth()->id();
+
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('regions', 'public');
             $validated['image'] = $path;
@@ -91,9 +92,10 @@ class RegionController extends Controller
         $validated = $request->validate([
             'name_ar' => 'sometimes|required|string',
             'name_en' => 'sometimes|required|string',
-            'manager_id' => ['sometimes', Rule::exists('users', 'id')->where('role', 'region_manager')],
             'image' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ]);
+        $validated['manager_id'] = auth()->id();
+
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('regions', 'public');
             $validated['image'] = $path;
