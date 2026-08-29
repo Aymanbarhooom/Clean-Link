@@ -32,6 +32,8 @@ class TaskController extends Controller
         $tasks = Task::whereHas('workgroup.workers', function ($query) use ($user) {
             $query->where('users.id', $user->id);
         })
+            ->leftJoin('orders', 'orders.id', '=', 'tasks.order_id')
+            ->select('tasks.*')
             ->with([
                 'order.package.service.company',
                 'order.attributes',
@@ -39,7 +41,7 @@ class TaskController extends Controller
                 'workgroup.leader.profile',
                 'workgroup.workers.profile',
             ])
-            ->orderBy('created_at', 'desc')
+            ->orderBy('orders.start_time', 'asc')
             ->get();
 
         return $this->successResponse(TaskResource::collection($tasks), 'Your workgroup tasks logs fetched');
