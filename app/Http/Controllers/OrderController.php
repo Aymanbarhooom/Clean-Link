@@ -110,7 +110,7 @@ class OrderController extends Controller
                 } else {
                     $roundedNow->addHour()->minute(0)->second(0);
                 }
-                $earliestPossibleStart = $roundedNow->addHour();
+                $earliestPossibleStart = $roundedNow->copy()->addMinutes($oneWayBufferMinutes);
                 $baseLoopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
             } else {
                 $baseLoopTime = $companyOpenTime;
