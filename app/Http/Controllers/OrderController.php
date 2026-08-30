@@ -107,7 +107,7 @@ class OrderController extends Controller
                 $roundedNow = $now->copy();
                 if ($now->minute < 30) {
                     $roundedNow->minute(30)->second(0);
-                } else {
+                }else {
                     $roundedNow->addHour()->minute(0)->second(0);
                 }
                 $earliestPossibleStart = $roundedNow->copy()->addMinutes($oneWayBufferMinutes);
