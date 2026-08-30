@@ -187,7 +187,7 @@ class ServiceController extends Controller
             [
                 'service_id' => $service->id,
                 'name_ar' => 'الباقة المفتوحة',
-                'name_en' => $service->name_en . 'Open Package',
+                'name_en' => 'Open Package',
                 'duration' => 0,
                 'price' => 0,
                 'price_after_discount'  =>0,
