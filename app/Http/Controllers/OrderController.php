@@ -110,12 +110,12 @@ class OrderController extends Controller
                 }else {
                     $roundedNow->addHour()->minute(0)->second(0);
                 }
-                $earliestPossibleStart = $roundedNow->copy()->addMinutes($oneWayBufferMinutes);
+                $earliestPossibleStart = $roundedNow->copy()->addMinutes($oneWayBufferMinutes/2);
                 $baseLoopTime = $companyOpenTime->gt($earliestPossibleStart) ? $companyOpenTime : $earliestPossibleStart;
             } else {
                 $baseLoopTime = $companyOpenTime;
             }
-            $loopTime = $baseLoopTime->copy()->addMinutes($oneWayBufferMinutes);
+            $loopTime = $baseLoopTime->copy()->addMinutes($oneWayBufferMinutes/2);
 
             $scheduleMatrix[$currentDayKey] = [];
 
