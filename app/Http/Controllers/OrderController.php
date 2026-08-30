@@ -119,10 +119,10 @@ class OrderController extends Controller
 
             $scheduleMatrix[$currentDayKey] = [];
 
-            while ($loopTime->copy()->addMinutes($packageDuration + $travelBufferMinutes)->lte($companyCloseTime)) {
+            while ($loopTime->copy()->addMinutes($packageDuration + ($travelBufferMinutes/2))->lte($companyCloseTime)) {
                 $slotStart = $loopTime->copy();
                 $slotEnd = $loopTime->copy()->addMinutes($packageDuration);
-                $slotEffectiveEnd = $slotEnd->copy()->addMinutes($travelBufferMinutes);
+                $slotEffectiveEnd = $slotEnd->copy()->addMinutes(($travelBufferMinutes)/2);
 
                 $isSlotAvailable = false;
 
